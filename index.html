@@ -511,14 +511,20 @@ async function checkSupabaseConnection(){
   }catch(e){ return false; }
 }
 
-// API keys (Twelve Data / Alpha Vantage / Gemini) are stored in hc_settings so
-// they persist across reloads and devices too, instead of being re-typed each time.
+// API keys (Twelve Data / Alpha Vantage / Gemini) are stored in this browser's
+// localStorage, NOT in Supabase. Unlike portfolio data, these keys must never be
+// readable by anyone who has the public Supabase URL/key (e.g. anyone who finds
+// this GitHub Pages link) — localStorage is per-device/per-browser and never
+// leaves this machine, so it's the right place for them. This does mean each
+// new device needs the keys typed in once; the portfolio data itself still
+// syncs everywhere via Supabase.
 async function loadApiKey(key){
-  const rows = await sbGet('hc_settings', `key=eq.${encodeURIComponent(key)}&select=value`);
-  return (rows && rows[0]) ? rows[0].value : '';
+  try{ return localStorage.getItem('hc_apikey_' + key) || ''; }
+  catch(e){ return ''; }
 }
 async function saveApiKey(key, value){
-  await sbUpsert('hc_settings', {key, value}, 'key');
+  try{ localStorage.setItem('hc_apikey_' + key, value); }
+  catch(e){ console.error('API 키 로컬 저장 실패:', e); }
 }
 
 /* ---------- State ---------- */
@@ -914,6 +920,7 @@ async function loadAllPrices(){
   log(`총 ${symbols.length}개 종목을 ${chunks.length}개 배치로 나눠 가져옵니다.`);
 
   let ok=0, fail=0;
+  const fetchedTickers = [];
   for(let i=0;i<chunks.length;i++){
     const c = chunks[i];
     const label = `배치 ${i+1}/${chunks.length}`;
@@ -932,6 +939,7 @@ async function loadAllPrices(){
           const series = parseSeries(entry.values);
           if(series.length<2){ fail++; log(`${sym}: 종가 부족`, 'fail'); continue; }
           seriesCache[sym] = series; ok++;
+          fetchedTickers.push(sym);
         }
       }
     }catch(err){
@@ -964,6 +972,28 @@ async function loadAllPrices(){
   else{ dot.className='dot error'; statusText.textContent = `${ok}개 성공, ${fail}개 실패`; }
 
   runBtn.disabled = false; runBtn.classList.remove('spinning');
+
+  // Save to Supabase in the background so other devices see this fetch too,
+  // without them needing to burn their own Twelve Data quota re-fetching it.
+  if(fetchedTickers.length){
+    log(`Supabase에 ${fetchedTickers.length}개 종목 주가 저장 중…`);
+    const rows = fetchedTickers.map(sym => ({
+      ticker: sym,
+      series: seriesCache[sym].map(p => ({date: p.date.toISOString().slice(0,10), close: p.close})),
+      fetched_at: new Date().toISOString(),
+    }));
+    const savedOk = await sbUpsert('hc_prices', rows, 'ticker', 300000);
+    log(savedOk ? 'Supabase 저장 완료' : `Supabase 저장 실패${lastStorageError ? `: ${lastStorageError}` : ''}`, savedOk ? 'ok' : 'fail');
+  }
+}
+async function loadPricesFromSupabase(){
+  const rows = await sbGet('hc_prices', 'select=*');
+  if(!rows) return;
+  rows.forEach(r => {
+    if(!r.series || !r.series.length) return;
+    seriesCache[r.ticker] = r.series.map(p => ({date: new Date(p.date), close: p.close}));
+  });
+  return rows.length ? new Date(Math.max(...rows.map(r => new Date(r.fetched_at).getTime()))) : null;
 }
 
 /* ---------- Charts ---------- */
@@ -2092,7 +2122,25 @@ async function loadAllDataFromSupabase(){
   renderCategoryTabs();
   renderEventCalendar();
 
-  statusText.textContent = 'API 키 입력 대기 중';
+  // Show whatever prices were last fetched (by this device or any other) immediately,
+  // without spending any Twelve Data quota just to display them again.
+  const lastFetched = await loadPricesFromSupabase();
+  if(lastFetched){
+    portfolio.forEach(p=>{
+      if(seriesCache[p.ticker]) fillRow(p.ticker, p.ticker, p.name, seriesCache[p.ticker], null);
+      categories.forEach(c=>{
+        if(p.categories.includes(c.id) && seriesCache[p.ticker]){
+          fillRow(`${c.id}-${p.ticker}`, p.ticker, p.name, seriesCache[p.ticker], null);
+        }
+      });
+    });
+    renderAllChart();
+    categories.forEach(c=>renderCategoryChart(c.id));
+    document.getElementById('status-dot').className = 'dot live';
+    document.getElementById('status-text').textContent = `저장된 주가 표시 중 · 최종 갱신 ${lastFetched.toLocaleString('ko-KR',{hour12:false})} — 최신 데이터가 필요하면 위 버튼을 눌러주세요`;
+  }else{
+    statusText.textContent = 'API 키 입력 대기 중';
+  }
 }
 
 async function refreshAllFromSupabase(){
