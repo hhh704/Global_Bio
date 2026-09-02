@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>헬스케어 포트폴리오 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B141B; --panel:#101B24; --panel-alt:#16232E;
+    --border:#223140; --border-soft:#1A2732;
+    --text:#E7EEF2; --text-dim:#8CA0AE; --text-faint:#5C7080;
+    --teal:#2DD4BF; --teal-dim:#1B8377;
+    --pos:#39D98A; --pos-bg:rgba(57,217,138,0.12);
+    --neg:#FF6B76; --neg-bg:rgba(255,107,118,0.12);
+    --amber:#F0B429;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  ::selection{background:var(--teal-dim);color:#fff;}
+  .wrap{max-width:1240px;margin:0 auto;padding:32px 24px 80px;}
+
+  .hero{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;
+    padding-bottom:24px;margin-bottom:8px;border-bottom:1px solid var(--border-soft);}
+  .hero-left h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;letter-spacing:-0.01em;margin:0 0 6px;}
+  .hero-left h1 .rx{color:var(--teal);}
+  .hero-left p{margin:0;color:var(--text-dim);font-size:14px;max-width:600px;line-height:1.5;}
+  .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
+  .status-row{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);flex:none;}
+  .dot.live{background:var(--pos);box-shadow:0 0 0 3px var(--pos-bg);}
+  .dot.error{background:var(--neg);box-shadow:0 0 0 3px var(--neg-bg);}
+
+  .key-row{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0;}
+  .key-box{flex:1;min-width:280px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .key-box label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);white-space:nowrap;}
+  .key-box input{flex:1;min-width:140px;background:var(--panel-alt);border:1px solid var(--border);
+    border-radius:8px;padding:8px 10px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .key-box input:focus{outline:none;border-color:var(--teal-dim);}
+
+  button{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;
+    background:var(--panel-alt);color:var(--teal);border:1px solid var(--border);
+    border-radius:var(--radius);padding:9px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+  button:hover{border-color:var(--teal-dim);}
+  button:active{transform:scale(0.97);}
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  button.small{padding:5px 10px;font-size:11px;}
+  button.btn-primary{background:var(--teal);color:#04211D;border-color:var(--teal);font-weight:700;padding:9px 18px;}
+  button.btn-primary:hover{background:#25c2ad;border-color:#25c2ad;}
+  button.danger{color:var(--neg);}
+  button svg{width:13px;height:13px;transition:transform .5s;}
+  button.spinning svg{animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .manage-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;}
+  .manage-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:800px){.manage-grid{grid-template-columns:1fr;}}
+  .manage-title{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin:0 0 12px;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel-alt);border:1px solid var(--border);
+    border-radius:999px;padding:5px 6px 5px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .chip button{padding:2px 6px;border-radius:999px;font-size:11px;background:transparent;border:none;color:var(--neg);}
+  .chip button:hover{background:var(--neg-bg);}
+
+  .add-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .add-form input[type=text]{background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .cat-check-list{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+  .cat-check{display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);
+    background:var(--panel-alt);border:1px solid var(--border);border-radius:999px;padding:5px 10px;}
+
+  .company-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:9px 12px;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;}
+  .company-row .info{font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .company-row .info b{font-family:'Space Grotesk',sans-serif;color:var(--text);}
+  .company-row .tags{font-size:10px;color:var(--text-faint);margin-left:8px;}
+
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;margin:40px 0 14px;flex-wrap:wrap;gap:8px;}
+  .section-head h2{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0;letter-spacing:-0.005em;}
+  .section-head .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:4px;}
+  .section-note{font-size:12px;color:var(--text-faint);}
+
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);}
+  table{width:100%;border-collapse:collapse;min-width:760px;}
+  thead th{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;
+    color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;
+    padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  thead th:first-child{text-align:left;}
+  tbody td{padding:13px 14px;font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;
+    border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--panel-alt);cursor:pointer;}
+  td.name-cell{text-align:left;font-family:'Inter',sans-serif;}
+  td.name-cell .tkr{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--text);}
+  td.name-cell .full{display:block;font-size:11px;color:var(--text-faint);margin-top:2px;font-weight:400;}
+  .pos{color:var(--pos);} .neg{color:var(--neg);} .flat{color:var(--text-faint);}
+  .load-skel::after{content:'···';color:var(--text-faint);letter-spacing:2px;}
+  .err-cell{color:var(--neg);font-size:11px;text-align:left;}
+
+  .chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 18px 14px;margin-top:16px;}
+  .chart-legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:12px;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);}
+  .chart-legend span{display:flex;align-items:center;gap:6px;}
+  .chart-legend i{width:10px;height:3px;border-radius:2px;display:inline-block;}
+
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+  .tab-btn{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;
+    background:transparent;color:var(--text-dim);border:1px solid var(--border);
+    border-radius:999px;padding:7px 16px;cursor:pointer;transition:all .15s;}
+  .tab-btn:hover{border-color:var(--teal-dim);color:var(--text);}
+  .tab-btn.active{background:var(--teal);color:#04211D;border-color:var(--teal);font-weight:600;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .log-box{background:#080D12;border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.85;
+    max-height:220px;overflow-y:auto;}
+  .log-line{white-space:pre-wrap;word-break:break-all;}
+  .log-line.ok{color:var(--pos);} .log-line.fail{color:var(--neg);} .log-line.info{color:var(--text-dim);}
+
+  /* Modal */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(4,8,11,0.75);z-index:50;
+    align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;}
+  .modal-overlay.open{display:flex;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:920px;width:100%;padding:26px;position:relative;}
+  .modal-close{position:absolute;top:16px;right:16px;}
+  .modal-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin:0 0 4px;}
+  .modal-sub{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin:0 0 20px;}
+  .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  @media (max-width:700px){.modal-grid{grid-template-columns:1fr;}}
+  .modal-section-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin:22px 0 10px;
+    display:flex;align-items:center;gap:8px;color:var(--teal);text-transform:uppercase;letter-spacing:0.05em;font-size:11px;}
+  .mini-chart-wrap{position:relative;height:220px;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:10px;}
+  .pipeline-img{max-width:80%;border-radius:8px;border:1px solid var(--border);display:block;margin-bottom:10px;}
+  .event-preview-img{max-width:64%;border-radius:8px;border:1px solid var(--border);display:block;margin-top:8px;}
+  .dropzone{border:1.5px dashed var(--border);border-radius:8px;transition:border-color .15s, background .15s;}
+  .dropzone.drag-over{border-color:var(--teal);background:rgba(45,212,191,0.06);}
+  .dropzone-hint{font-size:11px;color:var(--text-faint);text-align:center;padding:6px 0;}
+  .event-dropzone{display:inline-flex;align-items:center;gap:6px;background:var(--panel-alt);border:1.5px dashed var(--border);
+    border-radius:8px;padding:6px 12px;color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;transition:border-color .15s, background .15s;}
+  .event-dropzone.drag-over{border-color:var(--teal);background:rgba(45,212,191,0.06);}
+  textarea, .url-input{width:100%;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;resize:vertical;}
+  .events-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .event-item{display:flex;gap:10px;align-items:center;font-size:12px;font-family:'IBM Plex Mono',monospace;
+    background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;}
+  .event-item:hover{border-color:var(--teal-dim);}
+  .event-item .ethumb{width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex:none;}
+  .event-item .pin-check{flex:none;width:16px;height:16px;accent-color:var(--teal);cursor:pointer;}
+  .event-item .edate{color:var(--teal);font-weight:600;white-space:nowrap;}
+  .event-item .elabel{color:var(--text-dim);flex:1;}
+  .edit-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .edit-row input{background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:7px 9px;
+    color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;}
+
+  .footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--border-soft);}
+  .footer p{font-size:12px;color:var(--text-faint);line-height:1.7;margin:0 0 8px;max-width:820px;}
+  .footer code{font-family:'IBM Plex Mono',monospace;background:var(--panel-alt);padding:1px 5px;border-radius:4px;color:var(--teal);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="hero-left">
+      <h1>헬스케어 포트폴리오 <span class="rx">펄스</span></h1>
+      <p>내 포트폴리오 기업의 주가·수익률·매출·EPS·파이프라인·주요 이벤트를 질환별로 추적합니다.</p>
+    </div>
+    <div class="hero-right">
+      <div class="status-row"><span class="dot" id="status-dot"></span><span id="status-text">API 키 입력 대기 중</span></div>
+      <button id="run-btn" onclick="loadAllPrices()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v6h-6"/></svg>
+        주가 데이터 가져오기
+      </button>
+      <div style="display:flex;gap:8px;">
+        <button class="small" onclick="exportBackup()" title="현재 화면 데이터를 JSON 파일로 다운로드 (추가 백업용)">⭳ 데이터 내보내기</button>
+        <button class="small" onclick="refreshAllFromSupabase()" title="Supabase에서 전체 데이터 다시 불러오기">⟳ 새로고침</button>
+      </div>
+      <span class="section-note" style="max-width:260px;text-align:right;">데이터는 Supabase에 저장됩니다. "내보내기"는 만약을 위한 추가 백업입니다.</span>
+    </div>
+  </div>
+
+  <div class="key-row">
+    <div class="key-box">
+      <label>Supabase URL</label>
+      <input type="text" id="sb-url" placeholder="https://xxxxx.supabase.co" autocomplete="off" value="https://dhrgozetufvmoayumxbw.supabase.co">
+    </div>
+    <div class="key-box">
+      <label>Supabase Key</label>
+      <input type="text" id="sb-key" placeholder="sb_publishable_..." autocomplete="off" value="sb_publishable_z_Wqh7H0HYIouR50olc9Cg_4AftsAcv">
+    </div>
+  </div>
+
+  <div class="key-row">
+    <div class="key-box">
+      <label>Twelve Data 키 (주가)</label>
+      <input type="text" id="td-key" placeholder="Twelve Data API 키" autocomplete="off">
+    </div>
+    <div class="key-box">
+      <label>Alpha Vantage 키 (매출/EPS)</label>
+      <input type="text" id="av-key" placeholder="Alpha Vantage API 키" autocomplete="off">
+    </div>
+    <div class="key-box">
+      <label>Gemini 키 (이미지 인식)</label>
+      <input type="text" id="gemini-key" placeholder="Google Gemini API 키" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="manage-box">
+    <div class="manage-grid">
+      <div>
+        <div class="manage-title">질환 카테고리 관리</div>
+        <div class="chip-row" id="category-chips"></div>
+        <div class="add-form">
+          <input type="text" id="new-cat-name" placeholder="새 카테고리 이름 (예: mRNA 백신)">
+          <button class="small" onclick="addCategory()">카테고리 추가</button>
+        </div>
+      </div>
+      <div>
+        <div class="manage-title">포트폴리오 기업 관리</div>
+        <div id="company-list"></div>
+        <div class="add-form" style="margin-top:10px;">
+          <input type="text" id="new-tkr" placeholder="티커 (예: LLY)" style="width:100px;">
+          <input type="text" id="new-name" placeholder="회사명 (예: 일라이 릴리)" style="width:160px;">
+        </div>
+        <div class="cat-check-list" id="new-cat-checks"></div>
+        <button class="small" onclick="addCompany()">기업 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <div><span class="eyebrow">Section 01</span><h2>전체 포트폴리오</h2></div>
+    <span class="section-note">일간 / 주간 / 월간 / 분기 / 반기 / 연간 / 올해(YTD) · 행을 클릭하면 상세 정보</span>
+  </div>
+  <div style="margin-bottom:12px;">
+    <button class="small" id="mcap-btn" onclick="fetchMarketCaps()">시가총액·밸류에이션 가져오기 (Alpha Vantage)</button>
+    <span class="section-note" style="margin-left:8px;">종목당 15초 간격으로 순차 조회합니다 (API 한도 보호) · PER/PSR/PBR도 같은 요청으로 함께 가져옵니다</span>
+  </div>
+  <div class="table-scroll"><table>
+    <thead><tr><th>종목</th><th>현재가</th><th>시가총액</th><th>PER</th><th>PSR</th><th>PBR</th><th>일간</th><th>주간</th><th>월간</th><th>분기</th><th>반기</th><th>연간</th><th>올해</th></tr></thead>
+    <tbody id="all-tbody"></tbody>
+  </table></div>
+  <div class="chart-wrap">
+    <div style="position:relative;height:300px;"><canvas id="all-chart"></canvas></div>
+    <div id="all-chart-legend" class="chart-legend"></div>
+  </div>
+
+  <div class="section-head">
+    <div><span class="eyebrow">Section 02</span><h2>주요 이벤트 캘린더</h2></div>
+    <span class="section-note">기업 상세에서 ☑ 표시(체크박스)로 선택한 이벤트만 시간순으로 표시 · 행을 클릭하면 해당 기업 상세로 이동</span>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th style="text-align:left;">날짜</th><th style="text-align:left;">종목</th><th style="text-align:left;">이벤트</th><th>이미지</th></tr></thead>
+      <tbody id="calendar-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="section-head">
+    <div><span class="eyebrow">Section 03</span><h2>질환별 보기</h2></div>
+    <span class="section-note">카테고리 탭을 눌러 해당 질환의 기업만 필터링</span>
+  </div>
+  <div class="tabs" id="category-tabs"></div>
+  <div id="category-panels"></div>
+
+  <div class="section-head"><div><span class="eyebrow">Debug</span><h2>요청 로그</h2></div></div>
+  <div class="log-box" id="log-box"></div>
+
+  <div class="footer">
+    <p>주가는 Twelve Data(무료 티어: 분당 8크레딧, 심볼당 1크레딧)를 7개씩 배치로 나눠 65초 간격으로 가져옵니다. 매출/EPS/PER/PSR/PBR은 기업 상세를 열 때 Alpha Vantage에서 그때그때 가져옵니다. 카테고리·종목·파이프라인 이미지·주요 이벤트·매출/EPS는 전부 Supabase 데이터베이스에 저장되어, 브라우저나 기기를 바꿔도 그대로 유지됩니다.</p>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close small" onclick="closeModal()">✕ 닫기</button>
+    <div class="modal-title" id="modal-title">-</div>
+    <div class="modal-sub" id="modal-sub">-</div>
+
+    <div class="modal-section-title">1년 주가 추이</div>
+    <div id="modal-price-chart-wrap" class="mini-chart-wrap" style="height:200px;position:relative;">
+      <canvas id="modal-price-chart"></canvas>
+    </div>
+    <div id="modal-price-chart-status" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint);margin:6px 0 4px;"></div>
+
+    <div class="modal-section-title">매출 &amp; EPS</div>
+    <div id="modal-financials-status" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:10px;">불러오려면 아래 버튼을 누르세요.</div>
+    <button class="small" onclick="loadFinancials()">매출/EPS 가져오기 (Alpha Vantage)</button>
+    <div id="raw-data-panel" style="display:none;margin-top:10px;background:#080D12;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal);">Alpha Vantage 원본 데이터 (진단용)</span>
+        <button class="small" onclick="copyRawDataPanel()">복사</button>
+      </div>
+      <textarea id="raw-data-text" readonly rows="10" style="width:100%;background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;
+        padding:8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;resize:vertical;"></textarea>
+    </div>
+    <div class="modal-grid" style="margin-top:14px;">
+      <div>
+        <div id="label-rev-q" style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">최근 8개 분기 매출</div>
+        <div class="mini-chart-wrap"><canvas id="chart-rev-q"></canvas></div>
+      </div>
+      <div>
+        <div id="label-rev-y" style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">최근 5개 연도 매출</div>
+        <div class="mini-chart-wrap"><canvas id="chart-rev-y"></canvas></div>
+      </div>
+      <div>
+        <div id="label-eps-q" style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">최근 8개 분기 EPS</div>
+        <div class="mini-chart-wrap"><canvas id="chart-eps-q"></canvas></div>
+      </div>
+      <div>
+        <div id="label-eps-y" style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">최근 5개 연도 EPS</div>
+        <div class="mini-chart-wrap"><canvas id="chart-eps-y"></canvas></div>
+      </div>
+    </div>
+
+    <div class="modal-section-title">파이프라인 이미지</div>
+    <div id="pipeline-ir-link"></div>
+    <div id="pipeline-img-wrap" class="dropzone"
+         ondragenter="event.preventDefault();"
+         ondragover="event.preventDefault(); this.classList.add('drag-over');"
+         ondragleave="this.classList.remove('drag-over');"
+         ondrop="handlePipelineDrop(event); this.classList.remove('drag-over');"></div>
+    <input type="text" class="url-input" id="pipeline-url-input" placeholder="파이프라인 이미지 URL (회사 IR 자료 링크)">
+    <div class="edit-row">
+      <button class="small" onclick="savePipelineUrl()">URL로 저장</button>
+      <label class="small" style="cursor:pointer;display:inline-flex;align-items:center;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--teal);">
+        파일 업로드<input type="file" accept="image/*" id="pipeline-file-input" style="display:none;" onchange="handlePipelineFileUpload(event)">
+      </label>
+      <button class="small danger" onclick="clearPipelineImg()">이미지 삭제</button>
+    </div>
+
+    <div class="modal-section-title">주요 이벤트 (임상 발표 / 승인 일정)</div>
+    <div class="events-list" id="events-list"></div>
+    <div id="event-form-status" style="font-size:12px;color:var(--text-faint);margin:6px 0;"><span id="event-form-status-text"></span></div>
+    <img id="event-form-preview" class="event-preview-img" style="display:none;">
+    <div class="edit-row">
+      <input type="text" id="event-date" placeholder="YYYY / YYYY-MM / YYYY-Q1~4 / YYYY-MM-DD" style="width:200px;" oninput="saveDraft()">
+      <input type="text" id="event-label" placeholder="이벤트 내용" style="flex:1;min-width:200px;" oninput="saveDraft()">
+    </div>
+    <div class="edit-row" style="margin-top:8px;align-items:center;">
+      <label class="event-dropzone" id="event-dropzone"
+             ondragenter="event.preventDefault();"
+             ondragover="event.preventDefault(); this.classList.add('drag-over');"
+             ondragleave="this.classList.remove('drag-over');"
+             ondrop="handleEventDrop(event); this.classList.remove('drag-over');">
+        이미지 첨부 (클릭 또는 드래그)<input type="file" accept="image/*" id="event-file-input" style="display:none;" onchange="handleEventFileUpload(event)">
+      </label>
+      <button class="small" id="event-ai-btn" onclick="extractEventsWithAI()" style="display:none;">✨ AI로 이벤트 자동 추출</button>
+      <span style="flex:1;"></span>
+      <button class="btn-primary" id="event-submit-btn" onclick="submitEvent()">이벤트 추가</button>
+      <button class="small" id="event-cancel-btn" onclick="cancelEventEdit()" style="display:none;">취소</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ---------- Static reference data ---------- */
+const IR_LINKS = {
+  LLY: 'https://investor.lilly.com/',
+  NVO: 'https://www.novonordisk.com/investors.html',
+  ARWR: 'https://ir.arrowheadpharma.com/',
+  GPCR: 'https://ir.structuretx.com/',
+  MRNA: 'https://investors.modernatx.com/',
+  SRPT: 'https://investorrelations.sarepta.com/',
+  MDGL: 'https://ir.madrigalpharma.com/',
+  GH: 'https://ir.guardanthealth.com/',
+  NTRA: 'https://ir.natera.com/',
+  GRAL: 'https://ir.grail.com/',
+};
+
+const PALETTE = ['#2DD4BF','#F0B429','#5B9DFF','#F2789F','#8B7CF6','#6FDC8C','#FF9F5B','#57C7E3','#E36F9E','#C9D96A','#7FE0C0','#E0A96D'];
+
+
+/* ---------- Supabase REST API layer ----------
+   Data now lives in Supabase (tables prefixed hc_), not in this file or in
+   window.storage. localStorage is used only to remember the URL/key across
+   reloads when this file is opened as a normal local file (it doesn't work
+   inside the Claude artifact sandbox, but that no longer matters for data). */
+function sbConfig(){
+  const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key').value.trim();
+  return {url, key};
+}
+function sbHeaders(extra){
+  const {key} = sbConfig();
+  return Object.assign({
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  }, extra || {});
+}
+let lastStorageError = '';
+
+async function sbGet(table, query){
+  const {url} = sbConfig();
+  try{
+    const res = await fetch(`${url}/rest/v1/${table}${query ? '?' + query : ''}`, {
+      headers: sbHeaders(),
+    });
+    if(!res.ok){ lastStorageError = `GET ${table} 실패 (HTTP ${res.status})`; return null; }
+    return await res.json();
+  }catch(e){
+    lastStorageError = e.message;
+    return null;
+  }
+}
+// Upsert (insert or update on conflict) one or more rows. Splits large payloads
+// into byte-sized chunks automatically so big base64 image fields never hit
+// request-size limits.
+async function sbUpsert(table, rows, conflictCols, maxBytes){
+  maxBytes = maxBytes || 350000;
+  if(!Array.isArray(rows)) rows = [rows];
+  if(!rows.length) return true;
+  const chunks = [];
+  let cur = [], curSize = 0;
+  for(const row of rows){
+    const size = JSON.stringify(row).length;
+    if(cur.length && curSize + size > maxBytes){ chunks.push(cur); cur = []; curSize = 0; }
+    cur.push(row); curSize += size;
+  }
+  if(cur.length) chunks.push(cur);
+
+  const {url} = sbConfig();
+  let allOk = true;
+  for(const chunk of chunks){
+    try{
+      const res = await fetch(`${url}/rest/v1/${table}?on_conflict=${conflictCols}`, {
+        method: 'POST',
+        headers: sbHeaders({'Prefer': 'resolution=merge-duplicates,return=minimal'}),
+        body: JSON.stringify(chunk),
+      });
+      if(!res.ok){
+        const text = await res.text().catch(()=>'�');
+        lastStorageError = `${table} 저장 실패 (HTTP ${res.status}): ${text.slice(0,200)}`;
+        console.error(lastStorageError);
+        allOk = false;
+      }
+    }catch(e){
+      lastStorageError = e.message;
+      console.error(`${table} 저장 오류:`, e);
+      allOk = false;
+    }
+  }
+  return allOk;
+}
+async function sbDelete(table, filterQuery){
+  const {url} = sbConfig();
+  try{
+    const res = await fetch(`${url}/rest/v1/${table}?${filterQuery}`, {
+      method: 'DELETE',
+      headers: sbHeaders({'Prefer':'return=minimal'}),
+    });
+    if(!res.ok){ lastStorageError = `${table} 삭제 실패 (HTTP ${res.status})`; return false; }
+    return true;
+  }catch(e){
+    lastStorageError = e.message;
+    return false;
+  }
+}
+// Uploads a file (or a base64 data URL converted to a Blob) to Supabase Storage
+// and returns its public URL. Bucket 'hc-images' is public (set up in the schema).
+async function sbUploadImage(pathInBucket, blob, contentType){
+  const {url, key} = sbConfig();
+  try{
+    const res = await fetch(`${url}/storage/v1/object/hc-images/${pathInBucket}`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': contentType || 'application/octet-stream',
+        'x-upsert': 'true',
+      },
+      body: blob,
+    });
+    if(!res.ok){
+      const text = await res.text().catch(()=>'');
+      lastStorageError = `이미지 업로드 실패 (HTTP ${res.status}): ${text.slice(0,200)}`;
+      return null;
+    }
+    return `${url}/storage/v1/object/public/hc-images/${pathInBucket}`;
+  }catch(e){
+    lastStorageError = e.message;
+    return null;
+  }
+}
+function dataUrlToBlob(dataUrl){
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if(!match) return null;
+  const mime = match[1];
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return {blob: new Blob([bytes], {type: mime}), mime};
+}
+async function checkSupabaseConnection(){
+  const {url, key} = sbConfig();
+  if(!url || !key) return false;
+  try{
+    const res = await fetch(`${url}/rest/v1/hc_categories?select=id&limit=1`, {headers: sbHeaders()});
+    return res.ok;
+  }catch(e){ return false; }
+}
+
+// API keys (Twelve Data / Alpha Vantage / Gemini) are stored in hc_settings so
+// they persist across reloads and devices too, instead of being re-typed each time.
+async function loadApiKey(key){
+  const rows = await sbGet('hc_settings', `key=eq.${encodeURIComponent(key)}&select=value`);
+  return (rows && rows[0]) ? rows[0].value : '';
+}
+async function saveApiKey(key, value){
+  await sbUpsert('hc_settings', {key, value}, 'key');
+}
+
+/* ---------- State ---------- */
+let categories = [];
+let portfolio = [];
+
+async function persist(){
+  const catRows = categories.map(c => ({id:c.id, name:c.name}));
+  const compRows = portfolio.map(p => ({ticker:p.ticker, name:p.name}));
+  const mapRows = [];
+  portfolio.forEach(p => p.categories.forEach(cid => mapRows.push({ticker:p.ticker, category_id:cid})));
+  const okCat = await sbUpsert('hc_categories', catRows, 'id');
+  const okComp = await sbUpsert('hc_companies', compRows, 'ticker');
+  const okMap = mapRows.length ? await sbUpsert('hc_company_categories', mapRows, 'ticker,category_id') : true;
+  return okCat && okComp && okMap;
+}
+
+const seriesCache = {};
+let allChart = null;
+const categoryCharts = {};
+let currentModalTicker = null;
+let modalPriceChart = null;
+
+/* In-memory caches, hydrated from Supabase at startup so that
+   render functions (which build HTML synchronously) can read them instantly. */
+let marketCapCache = {};
+let extraCache = {};
+
+/* ---------- Logging ---------- */
+function log(msg, cls){
+  const box = document.getElementById('log-box');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + (cls||'info');
+  const t = new Date().toLocaleTimeString('ko-KR',{hour12:false});
+  line.textContent = `[${t}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- Formatting ---------- */
+function fmtPct(v){
+  if(v===null||v===undefined||isNaN(v)) return {text:'—', cls:'flat'};
+  const cls = v>0.005 ? 'pos' : (v<-0.005 ? 'neg' : 'flat');
+  const sign = v>0 ? '+' : '';
+  return {text:`${sign}${v.toFixed(2)}%`, cls};
+}
+function fmtPx(v){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  return v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:2}) : v.toFixed(2);
+}
+function retCell(v){ const f = fmtPct(v); return `<td class="${f.cls}">${f.text}</td>`; }
+
+/* ---------- Management UI ---------- */
+function renderManagementUI(){
+  document.getElementById('category-chips').innerHTML = categories.map(c => `
+    <span class="chip">${c.name}<button title="삭제" onclick="deleteCategory('${c.id}')">✕</button></span>
+  `).join('');
+
+  document.getElementById('new-cat-checks').innerHTML = categories.map(c => `
+    <label class="cat-check"><input type="checkbox" value="${c.id}" class="new-cat-check-box"> ${c.name}</label>
+  `).join('');
+
+  document.getElementById('company-list').innerHTML = portfolio.map(p => `
+    <div class="company-row">
+      <div class="info"><b>${p.ticker}</b> ${p.name}<span class="tags">${p.categories.map(cid => (categories.find(c=>c.id===cid)||{}).name).filter(Boolean).join(', ')}</span></div>
+      <button class="small danger" onclick="deleteCompany('${p.ticker}')">삭제</button>
+    </div>
+  `).join('');
+}
+
+async function addCategory(){
+  const input = document.getElementById('new-cat-name');
+  const name = input.value.trim();
+  if(!name) return;
+  const id = name.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').slice(0,30) + '_' + Date.now().toString(36).slice(-4);
+  categories.push({id, name});
+  input.value = '';
+  await persist();
+  renderManagementUI();
+  renderCategoryTabs();
+}
+
+async function deleteCategory(id){
+  categories = categories.filter(c => c.id !== id);
+  portfolio.forEach(p => { p.categories = p.categories.filter(cid => cid !== id); });
+  await sbDelete('hc_categories', `id=eq.${encodeURIComponent(id)}`); // cascades to hc_company_categories
+  renderManagementUI();
+  renderCategoryTabs();
+}
+
+async function addCompany(){
+  const tkrInput = document.getElementById('new-tkr');
+  const nameInput = document.getElementById('new-name');
+  const ticker = tkrInput.value.trim().toUpperCase();
+  const name = nameInput.value.trim() || ticker;
+  if(!ticker) return;
+  const checked = Array.from(document.querySelectorAll('.new-cat-check-box:checked')).map(cb => cb.value);
+  const isNew = !portfolio.some(p => p.ticker === ticker);
+  if(!isNew){
+    portfolio = portfolio.map(p => p.ticker === ticker ? {...p, name, categories: Array.from(new Set([...p.categories, ...checked]))} : p);
+  }else{
+    portfolio.push({ticker, name, categories: checked});
+  }
+  tkrInput.value=''; nameInput.value='';
+  document.querySelectorAll('.new-cat-check-box').forEach(cb=>cb.checked=false);
+  await persist();
+  if(isNew && !extraCache[ticker]) await loadExtra(ticker);
+  renderManagementUI();
+  renderCategoryTabs();
+  buildAllStructure();
+  renderEventCalendar();
+}
+
+async function deleteCompany(ticker){
+  portfolio = portfolio.filter(p => p.ticker !== ticker);
+  await sbDelete('hc_companies', `ticker=eq.${encodeURIComponent(ticker)}`); // cascades to mappings/financials/market_data/pipeline/events
+  delete extraCache[ticker];
+  delete marketCapCache[ticker];
+  delete financialsCache[ticker];
+  renderManagementUI();
+  renderCategoryTabs();
+  buildAllStructure();
+  renderEventCalendar();
+}
+
+/* ---------- Skeleton / structure ---------- */
+function renderSkeletonRow(rowId, displayTkr, label){
+  const mcap = getMarketCapCache(displayTkr);
+  const mcapCell = mcap
+    ? `<td class="mcap-cell" data-ticker="${displayTkr}">${fmtMarketCapUSD(mcap.value)}</td>`
+    : `<td class="mcap-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  const perCell = mcap
+    ? `<td class="per-cell" data-ticker="${displayTkr}">${fmtRatio(mcap.per)}</td>`
+    : `<td class="per-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  const psrCell = mcap
+    ? `<td class="psr-cell" data-ticker="${displayTkr}">${fmtRatio(mcap.psr)}</td>`
+    : `<td class="psr-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  const pbrCell = mcap
+    ? `<td class="pbr-cell" data-ticker="${displayTkr}">${fmtRatio(mcap.pbr)}</td>`
+    : `<td class="pbr-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  return `<tr id="row-${rowId}" onclick="openModal('${displayTkr}')">
+    <td class="name-cell"><span class="tkr">${displayTkr}</span><span class="full">${label}</span></td>
+    <td class="load-skel"></td>${mcapCell}${perCell}${psrCell}${pbrCell}
+    <td class="load-skel"></td><td class="load-skel"></td><td class="load-skel"></td><td class="load-skel"></td><td class="load-skel"></td><td class="load-skel"></td><td class="load-skel"></td>
+  </tr>`;
+}
+
+function buildAllStructure(){
+  document.getElementById('all-tbody').innerHTML = portfolio.map(p => renderSkeletonRow(p.ticker, p.ticker, p.name)).join('');
+}
+
+function renderCategoryTabs(){
+  const tabs = document.getElementById('category-tabs');
+  const panels = document.getElementById('category-panels');
+  tabs.innerHTML = categories.map((c,i) => `<button class="tab-btn ${i===0?'active':''}" data-target="cat-${c.id}" onclick="switchCatTab('${c.id}')">${c.name}</button>`).join('');
+  panels.innerHTML = categories.map((c,i) => {
+    const members = portfolio.filter(p => p.categories.includes(c.id));
+    return `
+    <div class="tab-panel ${i===0?'active':''}" id="cat-${c.id}">
+      <div class="table-scroll"><table>
+        <thead><tr><th>종목</th><th>현재가</th><th>시가총액</th><th>PER</th><th>PSR</th><th>PBR</th><th>일간</th><th>주간</th><th>월간</th><th>분기</th><th>반기</th><th>연간</th><th>올해</th></tr></thead>
+        <tbody>${members.map(p=>renderSkeletonRow(`${c.id}-${p.ticker}`, p.ticker, p.name)).join('') || '<tr><td colspan="12" class="err-cell">이 카테고리에 속한 기업이 없습니다.</td></tr>'}</tbody>
+      </table></div>
+      <div class="chart-wrap">
+        <div style="position:relative;height:280px;"><canvas id="chart-cat-${c.id}"></canvas></div>
+        <div id="chart-legend-cat-${c.id}" class="chart-legend"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchCatTab(id){
+  document.querySelectorAll('#category-tabs .tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.target===`cat-${id}`));
+  document.querySelectorAll('#category-panels .tab-panel').forEach(p=>p.classList.toggle('active', p.id===`cat-${id}`));
+}
+
+/* ---------- Returns math (shared) ---------- */
+function closestOnOrBefore(series, targetDate){
+  let best = null;
+  for(const p of series){
+    if(p.date.getTime() <= targetDate.getTime()){
+      if(!best || p.date.getTime() > best.date.getTime()) best = p;
+    }
+  }
+  return best || series[0];
+}
+function computeReturns(series){
+  const last = series[series.length-1];
+  const prev = series.length>1 ? series[series.length-2] : null;
+  const latestDate = last.date;
+  const mk = (months, days) => {
+    const d = new Date(latestDate);
+    if(days!==undefined) d.setDate(d.getDate()-days);
+    if(months!==undefined) d.setMonth(d.getMonth()-months);
+    return d;
+  };
+  const ytdBase = new Date(latestDate.getFullYear()-1, 11, 31);
+  function pct(targetDate){
+    const base = closestOnOrBefore(series, targetDate);
+    if(!base || !base.close) return null;
+    return (last.close/base.close - 1)*100;
+  }
+  return {
+    price: last.close,
+    daily: prev ? (last.close/prev.close - 1)*100 : null,
+    weekly: pct(mk(undefined,7)),
+    monthly: pct(mk(1)),
+    quarterly: pct(mk(3)),
+    half: pct(mk(6)),
+    annual: pct(mk(12)),
+    ytd: pct(ytdBase),
+  };
+}
+function parseSeries(values){
+  return values
+    .map(v => ({date: new Date(v.datetime), close: parseFloat(v.close)}))
+    .filter(p => !isNaN(p.close))
+    .sort((a,b) => a.date - b.date);
+}
+
+function fillRow(rowId, displayTkr, label, series, errorMsg){
+  const row = document.getElementById(`row-${rowId}`);
+  if(!row) return;
+  if(errorMsg){
+    row.innerHTML = `<td class="name-cell"><span class="tkr">${displayTkr}</span><span class="full">${label}</span></td>
+      <td colspan="12" class="err-cell">불러오기 실패: ${errorMsg}</td>`;
+    return;
+  }
+  const r = computeReturns(series);
+  const mcap = getMarketCapCache(displayTkr);
+  const mcapCell = mcap
+    ? `<td class="mcap-cell" data-ticker="${displayTkr}">${fmtMarketCapUSD(mcap.value)}</td>`
+    : `<td class="mcap-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  const perCell = mcap
+    ? `<td class="per-cell" data-ticker="${displayTkr}">${fmtRatio(mcap.per)}</td>`
+    : `<td class="per-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  const psrCell = mcap
+    ? `<td class="psr-cell" data-ticker="${displayTkr}">${fmtRatio(mcap.psr)}</td>`
+    : `<td class="psr-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  const pbrCell = mcap
+    ? `<td class="pbr-cell" data-ticker="${displayTkr}">${fmtRatio(mcap.pbr)}</td>`
+    : `<td class="pbr-cell load-skel" data-ticker="${displayTkr}"></td>`;
+  row.innerHTML = `
+    <td class="name-cell"><span class="tkr">${displayTkr}</span><span class="full">${label}</span></td>
+    <td>${fmtPx(r.price)}</td>
+    ${mcapCell}${perCell}${psrCell}${pbrCell}
+    ${retCell(r.daily)} ${retCell(r.weekly)} ${retCell(r.monthly)}
+    ${retCell(r.quarterly)} ${retCell(r.half)} ${retCell(r.annual)} ${retCell(r.ytd)}
+  `;
+}
+
+function fmtMarketCapUSD(raw){
+  const n = parseFloat(raw);
+  if(isNaN(n) || n<=0) return '—';
+  if(n >= 1e12) return '$'+(n/1e12).toFixed(2)+'T';
+  if(n >= 1e9) return '$'+(n/1e9).toFixed(2)+'B';
+  if(n >= 1e6) return '$'+(n/1e6).toFixed(2)+'M';
+  return '$'+n.toLocaleString();
+}
+function getMarketCapCache(ticker){
+  return marketCapCache[ticker] || null;
+}
+async function saveMarketCap(ticker, value, per, psr, pbr){
+  marketCapCache[ticker] = {value, per, psr, pbr, fetchedAt: Date.now()};
+  await sbUpsert('hc_market_data', {
+    ticker, market_cap: numOrNull(value), per: numOrNull(per), psr: numOrNull(psr), pbr: numOrNull(pbr),
+    fetched_at: new Date().toISOString(),
+  }, 'ticker');
+}
+function numOrNull(v){
+  const n = parseFloat(v);
+  return (v===undefined || v===null || v==='None' || v==='-' || isNaN(n)) ? null : n;
+}
+async function loadMarketCapsFromStorage(){
+  const rows = await sbGet('hc_market_data', 'select=*');
+  if(!rows) return;
+  rows.forEach(r => {
+    marketCapCache[r.ticker] = {
+      value: r.market_cap, per: r.per, psr: r.psr, pbr: r.pbr,
+      fetchedAt: r.fetched_at ? new Date(r.fetched_at).getTime() : Date.now(),
+    };
+  });
+}
+function updateMarketCapCells(ticker, rawValue, per, psr, pbr){
+  document.querySelectorAll(`.mcap-cell[data-ticker="${ticker}"]`).forEach(td => {
+    td.textContent = fmtMarketCapUSD(rawValue);
+    td.classList.remove('load-skel');
+  });
+  document.querySelectorAll(`.per-cell[data-ticker="${ticker}"]`).forEach(td => {
+    td.textContent = fmtRatio(per); td.classList.remove('load-skel');
+  });
+  document.querySelectorAll(`.psr-cell[data-ticker="${ticker}"]`).forEach(td => {
+    td.textContent = fmtRatio(psr); td.classList.remove('load-skel');
+  });
+  document.querySelectorAll(`.pbr-cell[data-ticker="${ticker}"]`).forEach(td => {
+    td.textContent = fmtRatio(pbr); td.classList.remove('load-skel');
+  });
+}
+function fmtRatio(v){
+  const n = parseFloat(v);
+  if(v===undefined || v===null || v==='None' || v==='-' || isNaN(n)) return '—';
+  return n.toFixed(2);
+}
+
+async function fetchMarketCaps(){
+  const avKey = document.getElementById('av-key').value.trim();
+  const btn = document.getElementById('mcap-btn');
+  if(!avKey){ alert('Alpha Vantage API 키를 상단에 입력하세요.'); return; }
+  await saveApiKey('av_api_key', avKey);
+
+  const symbols = Array.from(new Set(portfolio.map(p=>p.ticker)));
+  btn.disabled = true;
+  for(let i=0;i<symbols.length;i++){
+    const sym = symbols[i];
+    btn.textContent = `시가총액·밸류에이션 가져오는 중… (${i+1}/${symbols.length})`;
+    try{
+      const overview = await fetchAV('OVERVIEW', sym, avKey);
+      const cap = overview.MarketCapitalization;
+      const per = overview.PERatio, psr = overview.PriceToSalesRatioTTM, pbr = overview.PriceToBookRatio;
+      if(cap && cap !== 'None'){
+        await saveMarketCap(sym, cap, per, psr, pbr);
+        updateMarketCapCells(sym, cap, per, psr, pbr);
+      }
+    }catch(e){
+      console.error('시가총액·밸류에이션 조회 실패:', sym, e.message);
+    }
+    if(i < symbols.length-1) await sleep(15000);
+  }
+  btn.disabled = false;
+  btn.textContent = '시가총액·밸류에이션 가져오기 (Alpha Vantage)';
+}
+
+
+/* ---------- Twelve Data price fetch (chunked, rate-limit safe) ---------- */
+function chunk(arr, size){ const out=[]; for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size)); return out; }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function fetchBatch(symbols, apikey){
+  const symbolParam = symbols.join(',');
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbolParam)}&interval=1day&outputsize=400&order=ASC&apikey=${encodeURIComponent(apikey)}`;
+  log(`${symbols.length}개 심볼 배치 요청: ${symbols.join(', ')}`);
+  try{
+    const res = await fetch(url, {cache:'no-store'});
+    const json = await res.json();
+    log('직접 요청 성공', 'ok');
+    return json;
+  }catch(directErr){
+    log(`직접 요청 실패 (${directErr.message}) — 프록시로 재시도`, 'fail');
+  }
+  const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  const res = await fetch(proxied, {cache:'no-store'});
+  const json = await res.json();
+  log('프록시 경유 성공', 'ok');
+  return json;
+}
+function isRateLimitError(msg){
+  if(!msg) return false;
+  const m = msg.toLowerCase();
+  return m.includes('credit') || m.includes('limit') || m.includes('429');
+}
+async function fetchChunkWithRetry(c, apikey, label){
+  let data = await fetchBatch(c, apikey);
+  if(data && data.status === 'error' && isRateLimitError(data.message)){
+    log(`${label}: 크레딧 한도 — 70초 대기 후 재시도`, 'fail');
+    await sleep(70000);
+    data = await fetchBatch(c, apikey);
+  }
+  return data;
+}
+
+async function loadAllPrices(){
+  const tdKey = document.getElementById('td-key').value.trim();
+  const dot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const runBtn = document.getElementById('run-btn');
+  document.getElementById('log-box').innerHTML = '';
+  buildAllStructure();
+  renderCategoryTabs();
+
+  if(!tdKey){
+    dot.className='dot error'; statusText.textContent='Twelve Data API 키를 입력하세요';
+    log('Twelve Data API 키가 비어 있습니다.', 'fail');
+    return;
+  }
+  await saveApiKey('td_api_key', tdKey);
+
+  runBtn.disabled = true; runBtn.classList.add('spinning');
+  dot.className = 'dot';
+
+  const symbols = Array.from(new Set(portfolio.map(p=>p.ticker)));
+  const CHUNK_SIZE = 7, WAIT_MS = 65000;
+  const chunks = chunk(symbols, CHUNK_SIZE);
+  log(`총 ${symbols.length}개 종목을 ${chunks.length}개 배치로 나눠 가져옵니다.`);
+
+  let ok=0, fail=0;
+  for(let i=0;i<chunks.length;i++){
+    const c = chunks[i];
+    const label = `배치 ${i+1}/${chunks.length}`;
+    statusText.textContent = `${label} 가져오는 중… (${c.join(', ')})`;
+    try{
+      const data = await fetchChunkWithRetry(c, tdKey, label);
+      if(data && data.status === 'error'){
+        log(`${label} 전체 실패: ${data.message}`, 'fail');
+        c.forEach(()=>fail++);
+      }else{
+        for(const sym of c){
+          const entry = c.length===1 ? data : data[sym];
+          if(!entry || entry.status==='error' || !entry.values){
+            fail++; log(`${sym}: ${(entry&&entry.message)||'데이터 없음'}`, 'fail'); continue;
+          }
+          const series = parseSeries(entry.values);
+          if(series.length<2){ fail++; log(`${sym}: 종가 부족`, 'fail'); continue; }
+          seriesCache[sym] = series; ok++;
+        }
+      }
+    }catch(err){
+      log(`${label} 실패: ${err.message}`, 'fail');
+      c.forEach(()=>fail++);
+    }
+    if(i<chunks.length-1){
+      log(`다음 배치까지 ${WAIT_MS/1000}초 대기…`);
+      statusText.textContent = `대기 중… (${i+1}/${chunks.length} 완료)`;
+      await sleep(WAIT_MS);
+    }
+  }
+
+  portfolio.forEach(p=>{
+    if(seriesCache[p.ticker]) fillRow(p.ticker, p.ticker, p.name, seriesCache[p.ticker], null);
+    else fillRow(p.ticker, p.ticker, p.name, null, '데이터 없음');
+    categories.forEach(c=>{
+      if(p.categories.includes(c.id)){
+        const rowId = `${c.id}-${p.ticker}`;
+        if(seriesCache[p.ticker]) fillRow(rowId, p.ticker, p.name, seriesCache[p.ticker], null);
+        else fillRow(rowId, p.ticker, p.name, null, '데이터 없음');
+      }
+    });
+  });
+
+  renderAllChart();
+  categories.forEach(c=>renderCategoryChart(c.id));
+
+  if(fail===0){ dot.className='dot live'; statusText.textContent = `업데이트 완료 (${ok}개 종목) · ${new Date().toLocaleString('ko-KR',{hour12:false})}`; }
+  else{ dot.className='dot error'; statusText.textContent = `${ok}개 성공, ${fail}개 실패`; }
+
+  runBtn.disabled = false; runBtn.classList.remove('spinning');
+}
+
+/* ---------- Charts ---------- */
+function nearestClose(series, date){
+  let best = series[0]; let bestDiff = Math.abs(series[0].date.getTime()-date.getTime());
+  for(const p of series){ const diff = Math.abs(p.date.getTime()-date.getTime()); if(diff<bestDiff){best=p;bestDiff=diff;} }
+  return best.close;
+}
+function buildIndexedDatasets(items){
+  const valid = items.filter(it => seriesCache[it.symbol] && seriesCache[it.symbol].length>1);
+  if(valid.length===0) return null;
+  const anyLatest = seriesCache[valid[0].symbol][seriesCache[valid[0].symbol].length-1].date;
+  const oneYearAgo = new Date(anyLatest.getTime()); oneYearAgo.setDate(oneYearAgo.getDate()-365);
+  const ref = valid.reduce((a,b)=>seriesCache[a.symbol].length>=seriesCache[b.symbol].length?a:b);
+  const refSeries = seriesCache[ref.symbol].filter(p=>p.date.getTime()>=oneYearAgo.getTime());
+  const labels = refSeries.map(p=>p.date.toISOString().slice(0,10));
+  const datasets = valid.map(it=>{
+    const series = seriesCache[it.symbol].filter(p=>p.date.getTime()>=oneYearAgo.getTime());
+    const base = series.length? series[0].close : null;
+    const data = labels.map(l=>{ const c = nearestClose(seriesCache[it.symbol], new Date(l)); return base? +(c/base*100).toFixed(2) : null; });
+    return {label:it.symbol, data, borderColor:it.color, backgroundColor:it.color, borderWidth:1.8, pointRadius:0, pointHoverRadius:4, tension:0.15};
+  });
+  return {labels, datasets, items:valid};
+}
+function renderChart(canvasId, legendId, items, existingRef, setRef){
+  const built = buildIndexedDatasets(items);
+  const legendBox = document.getElementById(legendId);
+  if(!built){ if(legendBox) legendBox.innerHTML=''; return; }
+  if(legendBox) legendBox.innerHTML = built.items.map(it=>`<span><i style="background:${it.color}"></i>${it.symbol}</span>`).join('');
+  const ctx = document.getElementById(canvasId);
+  if(!ctx) return;
+  if(existingRef) existingRef.destroy();
+  const chartInst = new Chart(ctx, {
+    type:'line', data:{labels:built.labels, datasets:built.datasets},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(c)=>`${c.dataset.label}: ${c.parsed.y>0?'+':''}${c.parsed.y.toFixed(2)}`}} },
+      scales:{ x:{ticks:{color:'#5C7080', maxTicksLimit:10, font:{family:'IBM Plex Mono',size:10}}, grid:{display:false}},
+               y:{ticks:{color:'#5C7080', font:{family:'IBM Plex Mono',size:10}}, grid:{color:'#1A2732'}} } }
+  });
+  setRef(chartInst);
+}
+function renderAllChart(){
+  const items = portfolio.map((p,idx)=>({symbol:p.ticker, color:PALETTE[idx%PALETTE.length]}));
+  renderChart('all-chart','all-chart-legend', items, allChart, (c)=>allChart=c);
+}
+function renderCategoryChart(catId){
+  const members = portfolio.filter(p=>p.categories.includes(catId));
+  const items = members.map((p,idx)=>({symbol:p.ticker, color:PALETTE[idx%PALETTE.length]}));
+  renderChart(`chart-cat-${catId}`, `chart-legend-cat-${catId}`, items, categoryCharts[catId], (c)=>categoryCharts[catId]=c);
+}
+
+function renderModalPriceChart(ticker){
+  const statusEl = document.getElementById('modal-price-chart-status');
+  const canvas = document.getElementById('modal-price-chart');
+  if(modalPriceChart){ modalPriceChart.destroy(); modalPriceChart = null; }
+
+  const series = seriesCache[ticker];
+  if(!series || series.length < 2){
+    statusEl.textContent = '주가 데이터가 없습니다 — 상단 "주가 데이터 가져오기"를 먼저 눌러주세요.';
+    return;
+  }
+
+  const latest = series[series.length-1].date;
+  const oneYearAgo = new Date(latest.getTime());
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+  const windowed = series.filter(p => p.date.getTime() >= oneYearAgo.getTime());
+  if(windowed.length < 2){
+    statusEl.textContent = '1년치 데이터가 부족합니다.';
+    return;
+  }
+
+  const labels = windowed.map(p => p.date.toISOString().slice(0,10));
+  const closes = windowed.map(p => p.close);
+  const startPrice = closes[0], endPrice = closes[closes.length-1];
+  const up = endPrice >= startPrice;
+  const lineColor = up ? '#39D98A' : '#FF6B76';
+
+  modalPriceChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets: [{
+      data: closes,
+      borderColor: lineColor,
+      backgroundColor: lineColor,
+      borderWidth: 1.8,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.15,
+      fill: false,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${fmtPx(c.parsed.y)}` } }
+      },
+      scales: {
+        x: { ticks: { color:'#5C7080', maxTicksLimit:8, font:{family:'IBM Plex Mono',size:9} }, grid:{display:false} },
+        y: { ticks: { color:'#5C7080', font:{family:'IBM Plex Mono',size:9} }, grid:{color:'#1A2732'} }
+      }
+    }
+  });
+
+  const changePct = ((endPrice/startPrice)-1)*100;
+  const f = fmtPct(changePct);
+  statusEl.innerHTML = `1년 전 ${fmtPx(startPrice)} → 현재 ${fmtPx(endPrice)} (<span class="${f.cls}">${f.text}</span>)`;
+}
+
+function dateSortKey(dateStr){
+  if(!dateStr) return '0000-00';
+  const s = String(dateStr).trim();
+  const qMatch = s.match(/^(\d{4})-Q([1-4])$/i);
+  if(qMatch){
+    const month = {'1':'01','2':'04','3':'07','4':'10'}[qMatch[2]];
+    return `${qMatch[1]}-${month}`;
+  }
+  if(/^\d{4}$/.test(s)) return `${s}-01`;
+  return s;
+}
+
+function renderEventCalendar(){
+  const tbody = document.getElementById('calendar-tbody');
+  if(!tbody) return;
+
+  const rows = [];
+  portfolio.forEach(p => {
+    const extra = getExtra(p.ticker);
+    (extra.events||[]).filter(e => e.pinned).forEach(e => {
+      rows.push({ticker:p.ticker, name:p.name, date:e.date, label:e.label, image:e.image, isPast: isPastEvent(e.date)});
+    });
+  });
+
+  if(rows.length === 0){
+    tbody.innerHTML = `<tr><td colspan="4" class="err-cell">메인 캘린더에 표시하도록 선택한 이벤트가 없습니다. 각 기업 상세 화면에서 이벤트 옆 체크박스를 켜주세요.</td></tr>`;
+    return;
+  }
+
+  rows.sort((a,b) => dateSortKey(a.date).localeCompare(dateSortKey(b.date)));
+
+  tbody.innerHTML = rows.map(r => `
+    <tr onclick="openModal('${r.ticker}')" style="${r.isPast ? 'opacity:0.55;' : ''}">
+      <td style="text-align:left;">${r.date}</td>
+      <td class="name-cell"><span class="tkr">${r.ticker}</span><span class="full">${r.name}</span></td>
+      <td style="text-align:left;white-space:normal;max-width:420px;">${r.label}</td>
+      <td>${r.image ? `<img class="ethumb" src="${r.image}" alt="이벤트 이미지" style="cursor:zoom-in;" onclick="event.stopPropagation(); window.open('${r.image}','_blank');">` : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function isPastEvent(dateStr){
+  const normalized = dateSortKey(dateStr);
+  const parts = normalized.split('-').map(Number);
+  if(isNaN(parts[0])) return false;
+  const y = parts[0], m = (parts[1]||1)-1, d = parts[2]||1;
+  const isYearOnly = !/-/.test(String(dateStr).trim());
+  const isQuarterOrMonth = /^\d{4}-(Q[1-4]|\d{2})$/i.test(String(dateStr).trim());
+  let eventEnd;
+  if(isYearOnly) eventEnd = new Date(y+1, 0, 1);
+  else if(isQuarterOrMonth) eventEnd = new Date(y, m+ (String(dateStr).match(/-Q[1-4]$/i) ? 3 : 1), 1);
+  else eventEnd = new Date(y, m, d+1);
+  return eventEnd.getTime() <= Date.now();
+}
+
+/* ---------- Company detail modal ---------- */
+async function loadExtra(ticker){
+  const [pipeRows, eventRows] = await Promise.all([
+    sbGet('hc_pipeline', `ticker=eq.${encodeURIComponent(ticker)}&select=pipeline_url`),
+    sbGet('hc_events', `ticker=eq.${encodeURIComponent(ticker)}&select=*`),
+  ]);
+  const pipelineUrl = (pipeRows && pipeRows[0]) ? (pipeRows[0].pipeline_url || '') : '';
+  const events = (eventRows || []).map(r => ({
+    id: r.id, date: r.event_date, label: r.label, image: r.image_url || '', pinned: !!r.pinned,
+  }));
+  const extra = {pipelineUrl, events};
+  extraCache[ticker] = extra;
+  return extra;
+}
+function getExtra(ticker){
+  return extraCache[ticker] || {pipelineUrl:'', events:[]};
+}
+// Generic "sync this ticker's whole extra object to Supabase" — used after any
+// local mutation. Upserts pipeline + all current events. Deletions of individual
+// events are handled separately (see deleteEvent) since upsert can't remove rows.
+async function saveExtra(ticker, extra){
+  extraCache[ticker] = extra;
+  const okPipe = await sbUpsert('hc_pipeline', {ticker, pipeline_url: extra.pipelineUrl || ''}, 'ticker');
+  const eventRows = (extra.events||[]).map(e => ({
+    id: e.id, ticker, event_date: e.date, label: e.label, image_url: e.image || '', pinned: !!e.pinned,
+  }));
+  const okEvents = eventRows.length ? await sbUpsert('hc_events', eventRows, 'id') : true;
+  return okPipe && okEvents;
+}
+// Uploads a base64 data URL to Supabase Storage and returns its public URL.
+// If it's already a normal URL (not base64), or the upload fails, returns the input unchanged.
+async function persistImageIfNeeded(dataUrlOrUrl, pathHint){
+  if(!dataUrlOrUrl || !dataUrlOrUrl.startsWith('data:')) return dataUrlOrUrl;
+  const converted = dataUrlToBlob(dataUrlOrUrl);
+  if(!converted) return dataUrlOrUrl;
+  const ext = (converted.mime.split('/')[1] || 'jpg').split('+')[0];
+  const path = `${pathHint}_${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}.${ext}`;
+  const publicUrl = await sbUploadImage(path, converted.blob, converted.mime);
+  return publicUrl || dataUrlOrUrl; // fall back to storing base64 directly if the upload failed
+}
+
+let editingEventId = null;
+
+async function openModal(ticker){
+  currentModalTicker = ticker;
+  editingEventId = null;
+  const p = portfolio.find(x=>x.ticker===ticker);
+  document.getElementById('modal-title').textContent = `${ticker} — ${p ? p.name : ''}`;
+  document.getElementById('modal-overlay').classList.add('open');
+  const r = seriesCache[ticker] ? computeReturns(seriesCache[ticker]) : null;
+  document.getElementById('modal-sub').textContent = r ? `현재가 ${fmtPx(r.price)} · 일간 ${fmtPct(r.daily).text}` : '주가 데이터를 먼저 가져와주세요.';
+  renderModalPriceChart(ticker);
+
+  if(!extraCache[ticker]) await loadExtra(ticker);
+  const extra = getExtra(ticker);
+  document.getElementById('pipeline-url-input').value = extra.pipelineUrl || '';
+  renderPipelineImg(extra.pipelineUrl);
+  renderEventsList(extra.events);
+  await loadEventDraftOrReset(ticker);
+
+  const irUrl = IR_LINKS[ticker];
+  document.getElementById('pipeline-ir-link').innerHTML = irUrl
+    ? `<a href="${irUrl}" target="_blank" rel="noopener"><button class="small" type="button">${ticker} IR 홈페이지에서 파이프라인 보기 ↗</button></a>`
+    : '';
+
+  ['chart-rev-q','chart-rev-y','chart-eps-q','chart-eps-y'].forEach(id=>{
+    const c = window[`__modal_${id}`]; if(c){ c.destroy(); window[`__modal_${id}`]=null; }
+  });
+  await loadFinancialsFromCacheIfAny(ticker);
+}
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); currentModalTicker=null; }
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeImageFile(file, maxDim, quality){
+  maxDim = maxDim || 1100; quality = quality || 0.82;
+  return new Promise((resolve, reject) => {
+    fileToDataUrl(file).then(rawDataUrl => {
+      const img = new Image();
+      img.onload = () => {
+        let {width, height} = img;
+        if(width > maxDim || height > maxDim){
+          if(width > height){ height = Math.round(height * maxDim / width); width = maxDim; }
+          else{ width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        try{
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }catch(e){
+          resolve(rawDataUrl); // fallback (e.g. tainted canvas edge case) — use original
+        }
+      };
+      img.onerror = () => resolve(rawDataUrl);
+      img.src = rawDataUrl;
+    }).catch(reject);
+  });
+}
+
+function renderPipelineImg(url){
+  const wrap = document.getElementById('pipeline-img-wrap');
+  if(url){
+    wrap.innerHTML = `<img class="pipeline-img" src="${url}" alt="파이프라인 이미지" onerror="this.outerHTML='<div class=\\'err-cell\\'>이미지를 불러올 수 없습니다. URL을 확인하세요.</div>'">`;
+  }else{
+    wrap.innerHTML = `<div class="dropzone-hint">등록된 파이프라인 이미지가 없습니다. URL을 입력하거나, 파일을 업로드하거나, 이 영역에 이미지를 끌어다 놓으세요.</div>`;
+  }
+}
+function flashSaveWarning(msg){
+  // If the persistent "storage totally unavailable" banner is already showing, don't pile on more alerts.
+  if(document.getElementById('storage-warning-banner')) return;
+  const existing = document.getElementById('save-warning-flash');
+  if(existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'save-warning-flash';
+  banner.style.cssText = 'background:rgba(240,180,41,0.12);border:1px solid var(--amber);color:var(--amber);'
+    + 'border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;line-height:1.6;font-family:Inter,sans-serif;';
+  banner.textContent = msg;
+  const wrap = document.querySelector('.wrap');
+  if(wrap) wrap.insertBefore(banner, wrap.firstChild);
+  setTimeout(()=>{ if(banner.parentNode) banner.remove(); }, 7000);
+}
+
+async function savePipelineUrl(){
+  if(!currentModalTicker) return;
+  const url = document.getElementById('pipeline-url-input').value.trim();
+  const extra = getExtra(currentModalTicker);
+  extra.pipelineUrl = url;
+  renderPipelineImg(url); // show it immediately regardless of save outcome
+  const ok = await saveExtra(currentModalTicker, extra);
+  if(!ok) flashSaveWarning('화면에는 반영됐지만 저장에는 실패했습니다 — "데이터 내보내기"로 지금 백업해두세요.');
+}
+async function processPipelineFile(file){
+  const ticker = currentModalTicker; // pin the ticker — uploading can take a moment, during which the modal could switch
+  if(!ticker || !file) return;
+  if(!file.type || !file.type.startsWith('image/')) return;
+  let dataUrl;
+  try{
+    dataUrl = await fileToDataUrl(file); // keep the original file exactly as uploaded
+  }catch(e){
+    alert('이미지를 처리하는 중 오류가 발생했습니다: ' + e.message);
+    return;
+  }
+  const finalUrl = await persistImageIfNeeded(dataUrl, `pipeline/${ticker}`);
+  const extra = getExtra(ticker);
+  extra.pipelineUrl = finalUrl;
+  if(currentModalTicker === ticker){
+    document.getElementById('pipeline-url-input').value = '';
+    renderPipelineImg(finalUrl); // show it immediately regardless of save outcome
+  }
+  const ok = await sbUpsert('hc_pipeline', {ticker, pipeline_url: finalUrl}, 'ticker');
+  if(!ok){
+    flashSaveWarning(`화면에는 반영됐지만 저장에는 실패했습니다${lastStorageError ? ` (오류: ${lastStorageError})` : ''} — "데이터 내보내기"로 지금 백업해두세요.`);
+  }
+}
+async function handlePipelineFileUpload(event){
+  await processPipelineFile(event.target.files[0]);
+  event.target.value = '';
+}
+async function handlePipelineDrop(event){
+  event.preventDefault();
+  const dt = event.dataTransfer;
+  const file = dt.files && dt.files[0];
+  if(file){
+    await processPipelineFile(file);
+    return;
+  }
+  const url = extractUrlFromDataTransfer(dt);
+  if(url && currentModalTicker){
+    const ticker = currentModalTicker;
+    const extra = getExtra(ticker);
+    extra.pipelineUrl = url;
+    document.getElementById('pipeline-url-input').value = url;
+    renderPipelineImg(url);
+    const ok = await saveExtra(ticker, extra);
+    if(!ok) flashSaveWarning('화면에는 반영됐지만 저장에는 실패했습니다 — "데이터 내보내기"로 지금 백업해두세요.');
+  }
+}
+function extractUrlFromDataTransfer(dt){
+  const uriList = dt.getData('text/uri-list');
+  if(uriList) return uriList.split('\n').find(l => l && !l.startsWith('#'));
+  const html = dt.getData('text/html');
+  if(html){
+    const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if(match) return match[1];
+  }
+  const plain = dt.getData('text/plain');
+  if(plain && /^https?:\/\//i.test(plain.trim())) return plain.trim();
+  return null;
+}
+async function clearPipelineImg(){
+  if(!currentModalTicker) return;
+  const extra = getExtra(currentModalTicker);
+  extra.pipelineUrl = '';
+  renderPipelineImg('');
+  document.getElementById('pipeline-url-input').value = '';
+  const ok = await saveExtra(currentModalTicker, extra);
+  if(!ok) flashSaveWarning('화면에는 반영됐지만 저장에는 실패했습니다 — "데이터 내보내기"로 지금 백업해두세요.');
+}
+
+let pendingEventImage = '';
+
+function setEventFormStatus(text, isError){
+  const wrap = document.getElementById('event-form-status');
+  const textEl = document.getElementById('event-form-status-text');
+  const previewEl = document.getElementById('event-form-preview');
+  const aiBtn = document.getElementById('event-ai-btn');
+  textEl.textContent = text || '';
+  wrap.style.color = isError ? 'var(--neg)' : 'var(--text-faint)';
+  if(pendingEventImage){
+    previewEl.src = pendingEventImage;
+    previewEl.style.display = 'block';
+    aiBtn.style.display = document.getElementById('gemini-key').value.trim() ? 'inline-flex' : 'none';
+  }else{
+    previewEl.style.display = 'none';
+    previewEl.src = '';
+    aiBtn.style.display = 'none';
+  }
+}
+
+function renderEventsList(events){
+  const list = (events||[]).slice().sort((a,b)=> dateSortKey(a.date).localeCompare(dateSortKey(b.date)));
+  document.getElementById('events-list').innerHTML = list.length ? list.map(e=>`
+    <div class="event-item" onclick="startEditEvent('${e.id}')">
+      <input type="checkbox" class="pin-check" ${e.pinned ? 'checked' : ''} title="메인 이벤트 캘린더에 표시"
+        onclick="event.stopPropagation(); toggleEventPinned('${e.id}')">
+      ${e.image ? `<img class="ethumb" src="${e.image}" alt="이벤트 이미지">` : ''}
+      <span class="edate">${e.date}</span><span class="elabel">${e.label}</span>
+      <button class="small danger" onclick="event.stopPropagation(); deleteEvent('${e.id}')">✕</button>
+    </div>
+  `).join('') : `<div style="font-size:12px;color:var(--text-faint);">등록된 이벤트가 없습니다. 클릭하면 수정할 수 있습니다.</div>`;
+}
+
+async function toggleEventPinned(id){
+  if(!currentModalTicker) return;
+  const ticker = currentModalTicker;
+  const extra = getExtra(ticker);
+  extra.events = (extra.events||[]).map(e => e.id === id ? {...e, pinned: !e.pinned} : e);
+  extraCache[ticker] = extra;
+  renderEventsList(extra.events);
+  renderEventCalendar();
+  const ok = await saveExtra(ticker, extra);
+  if(!ok) flashSaveWarning('화면에는 반영됐지만 저장에는 실패했습니다 — "데이터 내보내기"로 지금 백업해두세요.');
+}
+
+let draftCache = {}; // ticker -> in-progress event draft, mirrors storage in memory for the same reason extraCache does
+
+async function saveDraft(){
+  if(!currentModalTicker) return;
+  const ticker = currentModalTicker;
+  const draft = {
+    date: document.getElementById('event-date').value,
+    label: document.getElementById('event-label').value,
+    image: pendingEventImage,
+    editingEventId: editingEventId
+  };
+  const hasContent = draft.date || draft.label || draft.image || draft.editingEventId;
+  if(hasContent){
+    draftCache[ticker] = draft;
+  }else{
+    delete draftCache[ticker];
+  }
+}
+async function clearDraft(ticker){
+  delete draftCache[ticker];
+}
+async function loadEventDraftOrReset(ticker){
+  const draft = draftCache[ticker] || null;
+
+  if(!draft){
+    resetEventForm();
+    return;
+  }
+  editingEventId = draft.editingEventId || null;
+  pendingEventImage = draft.image || '';
+  document.getElementById('event-date').value = draft.date || '';
+  document.getElementById('event-label').value = draft.label || '';
+  document.getElementById('event-submit-btn').textContent = editingEventId ? '수정 완료' : '이벤트 추가';
+  document.getElementById('event-cancel-btn').style.display = editingEventId ? 'inline-flex' : 'none';
+  setEventFormStatus('이전에 작성 중이던 내용을 불러왔습니다 (아직 "이벤트 추가"를 누르지 않은 상태입니다).');
+}
+
+function resetEventForm(){
+  editingEventId = null;
+  pendingEventImage = '';
+  document.getElementById('event-date').value = '';
+  document.getElementById('event-label').value = '';
+  document.getElementById('event-file-input').value = '';
+  document.getElementById('event-submit-btn').textContent = '이벤트 추가';
+  document.getElementById('event-cancel-btn').style.display = 'none';
+  setEventFormStatus('');
+}
+
+async function startEditEvent(id){
+  if(!currentModalTicker) return;
+  const extra = getExtra(currentModalTicker);
+  const ev = (extra.events||[]).find(e => e.id === id);
+  if(!ev) return;
+  editingEventId = id;
+  pendingEventImage = ev.image || '';
+  document.getElementById('event-date').value = ev.date;
+  document.getElementById('event-label').value = ev.label;
+  document.getElementById('event-submit-btn').textContent = '수정 완료';
+  document.getElementById('event-cancel-btn').style.display = 'inline-flex';
+  setEventFormStatus(ev.image ? '기존 이미지가 첨부되어 있습니다. 새 파일을 올리면 교체됩니다.' : '수정 중…');
+  await saveDraft();
+}
+
+async function cancelEventEdit(){
+  if(currentModalTicker) await clearDraft(currentModalTicker);
+  resetEventForm();
+}
+
+async function handleEventFileUpload(event){
+  const file = event.target.files[0];
+  await processEventFile(file);
+  event.target.value = '';
+}
+async function processEventFile(file){
+  if(!file || !file.type || !file.type.startsWith('image/')) return;
+  try{
+    pendingEventImage = await fileToDataUrl(file); // keep the original file exactly as uploaded
+  }catch(e){
+    setEventFormStatus('이미지 처리 중 오류: ' + e.message, true);
+    return;
+  }
+  const btnLabel = document.getElementById('event-submit-btn').textContent;
+  const sizeMB = (pendingEventImage.length / 1024 / 1024).toFixed(1);
+  setEventFormStatus(`원본 이미지 그대로 첨부됨 (약 ${sizeMB}MB) — 아래 "${btnLabel}" 버튼을 눌러 반영하세요.`);
+  await saveDraft();
+}
+async function handleEventDrop(event){
+  event.preventDefault();
+  const dt = event.dataTransfer;
+  const file = dt.files && dt.files[0];
+  if(file){
+    await processEventFile(file);
+    return;
+  }
+  const url = extractUrlFromDataTransfer(dt);
+  if(url){
+    pendingEventImage = url;
+    const btnLabel = document.getElementById('event-submit-btn').textContent;
+    setEventFormStatus(`이미지 링크 첨부됨 — 아래 "${btnLabel}" 버튼을 눌러 반영하세요.`);
+    await saveDraft();
+  }
+}
+
+async function extractEventsWithAI(){
+  const ticker = currentModalTicker; // pin ticker + image — the Gemini call can take several seconds
+  const imageForAI = pendingEventImage;
+  if(!ticker || !imageForAI) return;
+  const geminiKey = document.getElementById('gemini-key').value.trim();
+  if(!geminiKey){ setEventFormStatus('Gemini API 키를 상단에 입력하세요.', true); return; }
+  await saveApiKey('gemini_api_key', geminiKey);
+
+  const aiBtn = document.getElementById('event-ai-btn');
+  aiBtn.disabled = true;
+  setEventFormStatus('AI가 이미지를 분석하는 중… (몇 초 걸릴 수 있습니다)');
+
+  try{
+    const match = imageForAI.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+    if(!match){
+      setEventFormStatus('URL 링크 이미지는 AI 분석을 지원하지 않습니다. 파일을 직접 업로드해주세요.', true);
+      return;
+    }
+    const mimeType = match[1];
+    const base64Data = match[2];
+
+    const prompt = `다음 이미지는 제약/바이오 기업의 파이프라인 또는 주요 이벤트(임상시험 개시, 데이터 발표, 규제 신청, FDA 승인 등) 자료입니다.
+이미지 안에 있는 개별 이벤트 항목을 모두 찾아서 JSON 배열로만 응답하세요. 다른 설명 텍스트는 절대 포함하지 마세요.
+각 항목은 다음 형식입니다: {"date": "...", "label": "..."}
+- date는 이미지에서 확인 가능한 가장 구체적인 형태로 작성하세요: 정확한 날짜가 있으면 YYYY-MM-DD, 월 단위면 YYYY-MM, 분기 단위면 YYYY-Q1~Q4, 연도만 있으면 YYYY.
+- label에는 약물명, 적응증, 이벤트 종류를 간결하게 한국어로 요약하고, 원문에 카테고리(예: Phase 3 Initiations, Regulatory Submissions 등)가 있으면 앞에 대괄호로 표시하세요. 예: "[Phase 3 개시] Eloralintide — 비만/과체중"
+- 이미지에 날짜 정보가 전혀 없는 항목은 이미지 제목이나 문맥에서 유추 가능한 연도만이라도 넣어주세요.`;
+
+    const modelCandidates = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+    let json = null, lastErr = null;
+    for(const modelName of modelCandidates){
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(geminiKey)}`;
+      const body = {
+        contents: [{
+          parts: [
+            {text: prompt},
+            {inline_data: {mime_type: mimeType, data: base64Data}}
+          ]
+        }],
+        generationConfig: {response_mime_type: 'application/json'}
+      };
+      try{
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        });
+        const candidateJson = await res.json();
+        if(candidateJson.error){
+          lastErr = candidateJson.error.message;
+          continue; // try next model
+        }
+        json = candidateJson;
+        break;
+      }catch(e){
+        lastErr = e.message;
+      }
+    }
+    if(!json){
+      setEventFormStatus('AI 분석 실패: ' + (lastErr || '알 수 없는 오류'), true);
+      return;
+    }
+
+    const rawText = json.candidates && json.candidates[0] && json.candidates[0].content
+      && json.candidates[0].content.parts && json.candidates[0].content.parts[0]
+      && json.candidates[0].content.parts[0].text;
+    if(!rawText){
+      setEventFormStatus('AI 응답을 이해하지 못했습니다. 콘솔을 확인해주세요.', true);
+      console.error('Gemini raw response:', json);
+      return;
+    }
+
+    const cleaned = rawText.replace(/^```json\s*|```\s*$/g, '').trim();
+    let extracted;
+    try{
+      extracted = JSON.parse(cleaned);
+    }catch(e){
+      setEventFormStatus('AI가 반환한 형식을 해석하지 못했습니다.', true);
+      console.error('Gemini raw text:', rawText);
+      return;
+    }
+    if(!Array.isArray(extracted) || extracted.length === 0){
+      setEventFormStatus('이미지에서 이벤트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const uploadedUrl = await persistImageIfNeeded(imageForAI, `events/${ticker}`);
+
+    const extra = getExtra(ticker);
+    extra.events = extra.events || [];
+    const newEvents = [];
+    extracted.forEach((item) => {
+      if(!item || !item.date || !item.label) return;
+      const ev = {
+        id: 'ai_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        date: String(item.date).trim(),
+        label: String(item.label).trim(),
+        image: uploadedUrl, // same Storage URL reused across all events from this image — no duplication cost now
+        pinned: false
+      };
+      extra.events.push(ev);
+      newEvents.push(ev);
+    });
+    extraCache[ticker] = extra;
+    await clearDraft(ticker);
+    renderEventCalendar();
+    if(currentModalTicker === ticker){
+      renderEventsList(extra.events);
+      resetEventForm();
+      setEventFormStatus(`AI가 이벤트 ${extracted.length}건을 자동으로 추가했습니다. 메인 캘린더에는 기본적으로 표시되지 않으니, 필요한 항목만 체크해서 표시해주세요.`);
+    }
+    // Always save to the ticker we started analyzing for, regardless of what's open now.
+    const eventRows = newEvents.map(e => ({id:e.id, ticker, event_date:e.date, label:e.label, image_url:e.image||'', pinned:e.pinned}));
+    const ok = await sbUpsert('hc_events', eventRows, 'id');
+    if(!ok) flashSaveWarning('추출된 이벤트가 화면에는 반영됐지만 저장에는 실패했습니다 — "데이터 내보내기"로 지금 백업해두세요.');
+  }catch(err){
+    if(currentModalTicker === ticker) setEventFormStatus('AI 분석 중 오류: ' + err.message, true);
+  }finally{
+    aiBtn.disabled = false;
+  }
+}
+
+async function submitEvent(){
+  if(!currentModalTicker) return;
+  const ticker = currentModalTicker;
+  const date = document.getElementById('event-date').value.trim();
+  const label = document.getElementById('event-label').value.trim();
+  if(!date || !label){
+    setEventFormStatus('날짜와 이벤트 내용을 모두 입력해야 저장됩니다.', true);
+    return;
+  }
+  const finalImage = await persistImageIfNeeded(pendingEventImage, `events/${ticker}`);
+  const extra = getExtra(ticker);
+  extra.events = extra.events || [];
+
+  let newEvent;
+  if(editingEventId){
+    extra.events = extra.events.map(e => e.id === editingEventId ? {...e, date, label, image: finalImage} : e);
+    newEvent = extra.events.find(e => e.id === editingEventId);
+  }else{
+    newEvent = {id: 'ev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date, label, image: finalImage, pinned: true};
+    extra.events.push(newEvent);
+  }
+  extraCache[ticker] = extra;
+
+  // Reflect the change immediately, whether or not the save below succeeds.
+  renderEventsList(extra.events);
+  await clearDraft(ticker);
+  resetEventForm();
+  renderEventCalendar();
+
+  const ok = await sbUpsert('hc_events', {
+    id: newEvent.id, ticker, event_date: newEvent.date, label: newEvent.label,
+    image_url: newEvent.image || '', pinned: newEvent.pinned,
+  }, 'id');
+  if(!ok) flashSaveWarning('화면에는 반영됐지만 저장에는 실패했습니다 — "데이터 내보내기"로 지금 백업해두세요.');
+}
+
+async function deleteEvent(id){
+  if(!currentModalTicker) return;
+  const ticker = currentModalTicker;
+  const extra = getExtra(ticker);
+  extra.events = (extra.events||[]).filter(e => e.id !== id);
+  extraCache[ticker] = extra;
+  renderEventsList(extra.events);
+  if(editingEventId === id) resetEventForm();
+  renderEventCalendar();
+  const ok = await sbDelete('hc_events', `id=eq.${encodeURIComponent(id)}`);
+  if(!ok) flashSaveWarning('화면에는 반영됐지만 삭제에는 실패했습니다 — 새로고침하면 다시 나타날 수 있습니다.');
+}
+
+/* ---------- Alpha Vantage financials ---------- */
+async function fetchAV(functionName, symbol, apikey){
+  const url = `https://www.alphavantage.co/query?function=${functionName}&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apikey)}`;
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error(`${functionName} HTTP ${res.status}`);
+  const json = await res.json();
+  if(json['Error Message']) throw new Error(json['Error Message']);
+  if(json['Note']) throw new Error(json['Note']);
+  if(json['Information']) throw new Error(json['Information']);
+  return json;
+}
+
+function miniBarChart(canvasId, labels, data, color, existingKey){
+  const ctx = document.getElementById(canvasId);
+  if(window[existingKey]) window[existingKey].destroy();
+  window[existingKey] = new Chart(ctx, {
+    type:'bar',
+    data:{labels, datasets:[{data, backgroundColor:color, borderRadius:4}]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#5C7080', font:{family:'IBM Plex Mono',size:9}}, grid:{display:false}},
+               y:{ticks:{color:'#5C7080', font:{family:'IBM Plex Mono',size:9}}, grid:{color:'#1A2732'}} } }
+  });
+}
+
+// Alpha Vantage sometimes returns some quarters/years in the company's local reporting
+// currency (e.g. DKK for Novo Nordisk) and others in USD, inconsistently, for foreign
+// filers. Mixing these in one chart makes bars 6-7x too tall/short depending on currency.
+// Alpha Vantage sometimes puts the literal string "None" (not null/empty) in reportedCurrency
+// when it doesn't actually know the currency. Treat that — and a few other placeholder
+// strings it's known to use — as "no currency info", not as a real currency code.
+function normalizeCurrency(raw){
+  const cur = (raw || '').toString().trim().toUpperCase();
+  if(!cur || cur === 'NONE' || cur === 'N/A' || cur === 'NULL' || cur === '-') return '';
+  return cur;
+}
+
+function pickMajorityCurrency(reports){
+  const counts = {};
+  reports.forEach(r => {
+    const cur = normalizeCurrency(r.reportedCurrency);
+    if(!cur) return;
+    counts[cur] = (counts[cur]||0) + 1;
+  });
+  let best = null, bestCount = 0;
+  Object.keys(counts).forEach(cur => { if(counts[cur] > bestCount){ best = cur; bestCount = counts[cur]; } });
+  return best; // null if no currency info at all
+}
+function filterByCurrency(reports, majorityCurrency){
+  if(!majorityCurrency) return {kept: reports, excludedCount: 0};
+  const kept = reports.filter(r => { const cur = normalizeCurrency(r.reportedCurrency); return !cur || cur === majorityCurrency; });
+  return {kept, excludedCount: reports.length - kept.length};
+}
+
+// ---- FX conversion (preferred path when FX data is available) ----
+async function fetchFxDaily(fromCurrency, toCurrency, apikey){
+  const url = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=${encodeURIComponent(fromCurrency)}&to_symbol=${encodeURIComponent(toCurrency)}&outputsize=full&apikey=${encodeURIComponent(apikey)}`;
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error(`FX_DAILY HTTP ${res.status}`);
+  const json = await res.json();
+  if(json['Error Message']) throw new Error(json['Error Message']);
+  if(json['Note']) throw new Error(json['Note']);
+  if(json['Information']) throw new Error(json['Information']);
+  const series = json['Time Series FX (Daily)'] || {};
+  const points = Object.keys(series).map(d => ({date:d, rate:parseFloat(series[d]['4. close'])})).filter(p=>!isNaN(p.rate));
+  points.sort((a,b)=> a.date.localeCompare(b.date));
+  if(points.length){
+    console.log(`[FX_DAILY ${fromCurrency}->${toCurrency}] ${points.length}개 날짜, 범위 ${points[0].date}~${points[points.length-1].date}, 최근 환율 예시: ${points[points.length-1].date} = ${points[points.length-1].rate}`);
+  }else{
+    console.warn(`[FX_DAILY ${fromCurrency}->${toCurrency}] 응답에 시계열 데이터가 없습니다.`, json);
+  }
+  return points; // [{date:'YYYY-MM-DD', rate: <units of toCurrency per 1 fromCurrency>}, ...]
+}
+function findNearestFxRate(fxSeries, targetDateStr){
+  if(!fxSeries || !fxSeries.length || !targetDateStr) return null;
+  const target = new Date(targetDateStr).getTime();
+  if(isNaN(target)) return null;
+  let best = fxSeries[0], bestDiff = Math.abs(new Date(fxSeries[0].date).getTime() - target);
+  for(const p of fxSeries){
+    const diff = Math.abs(new Date(p.date).getTime() - target);
+    if(diff < bestDiff){ best = p; bestDiff = diff; }
+  }
+  return best.rate;
+}
+// Converts a list of INCOME_STATEMENT reports to USD using fxRatesByCurrency (currency -> FX_DAILY series).
+// Reports already in USD pass through unchanged. Reports whose currency has no FX series are excluded
+// (same behavior as before FX support existed), rather than shown wrong or silently dropped without a count.
+function convertReportsToUsd(reports, fxRatesByCurrency){
+  let excludedCount = 0;
+  const kept = [];
+  reports.forEach(r => {
+    const cur = normalizeCurrency(r.reportedCurrency) || 'USD';
+    const revenue = parseFloat(r.totalRevenue);
+    if(cur === 'USD' || !cur){
+      kept.push({...r, __usdRevenue: revenue, __converted:false});
+      return;
+    }
+    const series = fxRatesByCurrency[cur];
+    const rate = series ? findNearestFxRate(series, r.fiscalDateEnding) : null;
+    if(rate == null){ excludedCount++; return; }
+    const usdValue = revenue * rate;
+    console.log(`[FX 변환] ${r.fiscalDateEnding}: 원본 ${revenue.toLocaleString()} ${cur} × 환율 ${rate} = ${usdValue.toLocaleString()} USD (차트엔 ÷1e6 = ${(usdValue/1e6).toLocaleString()} 백만달러로 표시)`);
+    kept.push({...r, __usdRevenue: usdValue, __converted:true});
+  });
+  return {kept, excludedCount};
+}
+function convertEarningsToUsd(earningsList, currencyByDate, fxRatesByCurrency){
+  let excludedCount = 0;
+  const kept = [];
+  earningsList.forEach(r => {
+    const cur = currencyByDate[r.fiscalDateEnding];
+    const eps = parseFloat(r.reportedEPS);
+    if(!cur || cur === 'USD'){
+      kept.push({...r, __usdEPS: eps, __converted:false});
+      return;
+    }
+    const series = fxRatesByCurrency[cur];
+    const rate = series ? findNearestFxRate(series, r.fiscalDateEnding) : null;
+    if(rate == null){ excludedCount++; return; }
+    kept.push({...r, __usdEPS: eps * rate, __converted:true});
+  });
+  return {kept, excludedCount};
+}
+
+function renderFinancialsData(income, earnings, fxRatesByCurrency){
+  const allIncomeReports = [...(income.quarterlyReports||[]), ...(income.annualReports||[])];
+  const majorityCurrency = pickMajorityCurrency(allIncomeReports);
+  const haveFx = fxRatesByCurrency && Object.keys(fxRatesByCurrency).length > 0;
+
+  let qKeptReports, yKeptReports, qExcluded, yExcluded, usingConversion = false;
+
+  if(haveFx){
+    usingConversion = true;
+    const qConv = convertReportsToUsd(income.quarterlyReports||[], fxRatesByCurrency);
+    const yConv = convertReportsToUsd(income.annualReports||[], fxRatesByCurrency);
+    qKeptReports = qConv.kept; yKeptReports = yConv.kept;
+    qExcluded = qConv.excludedCount; yExcluded = yConv.excludedCount;
+  }else{
+    const qFiltered = filterByCurrency(income.quarterlyReports||[], majorityCurrency);
+    const yFiltered = filterByCurrency(income.annualReports||[], majorityCurrency);
+    qKeptReports = qFiltered.kept.map(r => ({...r, __usdRevenue: parseFloat(r.totalRevenue), __converted:false}));
+    yKeptReports = yFiltered.kept.map(r => ({...r, __usdRevenue: parseFloat(r.totalRevenue), __converted:false}));
+    qExcluded = qFiltered.excludedCount; yExcluded = yFiltered.excludedCount;
+  }
+
+  const qReports = qKeptReports.slice(0,8).reverse();
+  const yReports = yKeptReports.slice(0,5).reverse();
+  miniBarChart('chart-rev-q', qReports.map(r=>r.fiscalDateEnding), qReports.map(r=>r.__usdRevenue/1e6), '#2DD4BF', '__modal_chart-rev-q');
+  miniBarChart('chart-rev-y', yReports.map(r=>r.fiscalDateEnding.slice(0,4)), yReports.map(r=>r.__usdRevenue/1e6), '#5B9DFF', '__modal_chart-rev-y');
+
+  // EARNINGS entries don't carry their own reportedCurrency field, so infer each period's
+  // currency from the matching INCOME_STATEMENT entry for the same fiscalDateEnding.
+  const currencyByDate = {};
+  allIncomeReports.forEach(r => { if(r.fiscalDateEnding) currencyByDate[r.fiscalDateEnding] = normalizeCurrency(r.reportedCurrency); });
+
+  let qEarnReports, yEarnReports, qEarnExcluded, yEarnExcluded;
+  if(haveFx){
+    const qConv = convertEarningsToUsd(earnings.quarterlyEarnings||[], currencyByDate, fxRatesByCurrency);
+    const yConv = convertEarningsToUsd(earnings.annualEarnings||[], currencyByDate, fxRatesByCurrency);
+    qEarnReports = qConv.kept; yEarnReports = yConv.kept;
+    qEarnExcluded = qConv.excludedCount; yEarnExcluded = yConv.excludedCount;
+  }else{
+    function filterEarningsByCurrency(list){
+      if(!majorityCurrency) return {kept:list, excludedCount:0};
+      const kept = list.filter(r => { const cur = currencyByDate[r.fiscalDateEnding]; return !cur || cur === majorityCurrency; });
+      return {kept, excludedCount: list.length - kept.length};
+    }
+    const qFiltered = filterEarningsByCurrency(earnings.quarterlyEarnings||[]);
+    const yFiltered = filterEarningsByCurrency(earnings.annualEarnings||[]);
+    qEarnReports = qFiltered.kept.map(r => ({...r, __usdEPS: parseFloat(r.reportedEPS), __converted:false}));
+    yEarnReports = yFiltered.kept.map(r => ({...r, __usdEPS: parseFloat(r.reportedEPS), __converted:false}));
+    qEarnExcluded = qFiltered.excludedCount; yEarnExcluded = yFiltered.excludedCount;
+  }
+  const qEarn = qEarnReports.slice(0,8).reverse();
+  const yEarn = yEarnReports.slice(0,5).reverse();
+  miniBarChart('chart-eps-q', qEarn.map(r=>r.fiscalDateEnding), qEarn.map(r=>r.__usdEPS), '#F0B429', '__modal_chart-eps-q');
+  miniBarChart('chart-eps-y', yEarn.map(r=>r.fiscalDateEnding.slice(0,4)), yEarn.map(r=>r.__usdEPS), '#F2789F', '__modal_chart-eps-y');
+
+  const curLabel = usingConversion ? ' (백만 달러, 환산됨)' : (majorityCurrency ? ` (${majorityCurrency === 'USD' ? '백만 달러' : '백만 ' + majorityCurrency})` : '');
+  const curLabelEps = usingConversion ? ' (USD, 환산됨)' : (majorityCurrency ? ` (${majorityCurrency})` : '');
+  document.getElementById('label-rev-q').textContent = `최근 ${qReports.length}개 분기 매출${curLabel}` + (qExcluded ? ` — 환율 정보 없어 ${qExcluded}건 제외` : '');
+  document.getElementById('label-rev-y').textContent = `최근 ${yReports.length}개 연도 매출${curLabel}` + (yExcluded ? ` — 환율 정보 없어 ${yExcluded}건 제외` : '');
+  document.getElementById('label-eps-q').textContent = `최근 ${qEarn.length}개 분기 EPS${curLabelEps}` + (qEarnExcluded ? ` — 환율 정보 없어 ${qEarnExcluded}건 제외` : '');
+  document.getElementById('label-eps-y').textContent = `최근 ${yEarn.length}개 연도 EPS${curLabelEps}` + (yEarnExcluded ? ` — 환율 정보 없어 ${yEarnExcluded}건 제외` : '');
+
+  return {
+    qCount: qReports.length, yCount: yReports.length,
+    majorityCurrency, usingConversion,
+    excludedTotal: qExcluded + yExcluded + qEarnExcluded + yEarnExcluded,
+  };
+}
+
+let financialsCache = {}; // ticker -> {income, earnings, fxRates, fetchedAt} — mirrors Supabase in memory so
+                           // closing/reopening the modal in the same session always shows the latest
+                           // fetch instantly, without depending on another network round-trip.
+
+async function getFinancialsCache(ticker){
+  if(financialsCache[ticker]) return financialsCache[ticker];
+  const rows = await sbGet('hc_financials', `ticker=eq.${encodeURIComponent(ticker)}&select=*`);
+  if(!rows || !rows[0]) return null;
+  const r = rows[0];
+  const parsed = {income: r.income, earnings: r.earnings, fxRates: r.fx_rates, fetchedAt: r.fetched_at ? new Date(r.fetched_at).getTime() : Date.now()};
+  financialsCache[ticker] = parsed;
+  return parsed;
+}
+async function saveFinancialsCache(ticker, income, earnings, fxRates){
+  const data = {income, earnings, fxRates: fxRates || null, fetchedAt: Date.now()};
+  financialsCache[ticker] = data; // update memory immediately — this succeeds even if the network write below is slow or fails
+  return await sbUpsert('hc_financials', {
+    ticker, income, earnings, fx_rates: fxRates || null, fetched_at: new Date(data.fetchedAt).toISOString(),
+  }, 'ticker', 300000);
+}
+
+async function loadFinancialsFromCacheIfAny(ticker){
+  const cache = await getFinancialsCache(ticker);
+  const statusEl = document.getElementById('modal-financials-status');
+  if(!cache){
+    statusEl.textContent = '불러오려면 아래 버튼을 누르세요.';
+    return;
+  }
+  const {qCount, yCount, majorityCurrency, usingConversion, excludedTotal} = renderFinancialsData(cache.income, cache.earnings, cache.fxRates);
+  const when = new Date(cache.fetchedAt).toLocaleString('ko-KR', {hour12:false});
+  const curNote = usingConversion ? ' · USD로 환산됨' : (majorityCurrency ? ` · 통화: ${majorityCurrency}` : '');
+  const exclNote = excludedTotal ? ` · ${excludedTotal}건 제외됨` : '';
+  statusEl.textContent = `저장된 데이터 표시 중 (${when} 기준, 분기 ${qCount}개/연간 ${yCount}개${curNote}${exclNote}) — 최신 데이터가 필요하면 아래 버튼을 다시 눌러주세요.`;
+}
+
+function copyRawDataPanel(){
+  const text = document.getElementById('raw-data-text');
+  text.select();
+  try{
+    document.execCommand('copy');
+  }catch(e){ /* fall through */ }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text.value).catch(()=>{});
+  }
+}
+
+async function loadFinancials(){
+  const ticker = currentModalTicker; // pin the ticker — currentModalTicker can change mid-fetch if the user opens another company
+  if(!ticker) return;
+  const avKey = document.getElementById('av-key').value.trim();
+  const statusEl = document.getElementById('modal-financials-status');
+  if(!avKey){ statusEl.textContent = 'Alpha Vantage API 키를 상단에 입력하세요.'; return; }
+  await saveApiKey('av_api_key', avKey);
+
+  if(currentModalTicker === ticker) statusEl.textContent = `${ticker} 매출/EPS 가져오는 중…`;
+  try{
+    const income = await fetchAV('INCOME_STATEMENT', ticker, avKey);
+    await sleep(1200);
+    const earnings = await fetchAV('EARNINGS', ticker, avKey);
+    const rawDebugInfo = (income.quarterlyReports||[]).slice(0,8).map(r => ({
+      fiscalDateEnding: r.fiscalDateEnding, reportedCurrency: r.reportedCurrency, totalRevenue: r.totalRevenue
+    }));
+    if(currentModalTicker === ticker){
+      const panel = document.getElementById('raw-data-panel');
+      const text = document.getElementById('raw-data-text');
+      panel.style.display = 'block';
+      text.value = `[${ticker}] 최근 분기 8개 원본 (Alpha Vantage INCOME_STATEMENT):\n` +
+        rawDebugInfo.map(r => `${r.fiscalDateEnding}  |  통화: ${r.reportedCurrency}  |  매출: ${r.totalRevenue}`).join('\n');
+    }
+
+    // If any period isn't already in USD, fetch historical FX rates for each such
+    // currency and convert everything to USD instead of excluding mismatched periods.
+    const allIncomeReports = [...(income.quarterlyReports||[]), ...(income.annualReports||[])];
+    const nonUsdCurrencies = Array.from(new Set(
+      allIncomeReports.map(r => normalizeCurrency(r.reportedCurrency)).filter(c => c && c !== 'USD')
+    ));
+    const fxRates = {};
+    for(let i=0;i<nonUsdCurrencies.length;i++){
+      const cur = nonUsdCurrencies[i];
+      if(currentModalTicker === ticker) statusEl.textContent = `${ticker}: ${cur}→USD 환율 기록 가져오는 중…`;
+      await sleep(1200);
+      try{
+        fxRates[cur] = await fetchFxDaily(cur, 'USD', avKey);
+      }catch(fxErr){
+        console.error(`FX_DAILY ${cur}->USD 실패:`, fxErr.message);
+        // Leave this currency out of fxRates — renderFinancialsData will exclude those periods
+        // and report the count, rather than silently showing wrong numbers.
+      }
+    }
+
+    // Render immediately with the freshly fetched data, before attempting to save.
+    // Saving can take a moment, and the chart should never wait on (or be skipped because of) that.
+    let renderResult = null;
+    if(currentModalTicker === ticker){
+      renderResult = renderFinancialsData(income, earnings, fxRates);
+    }
+
+    // Always save under the ticker we started fetching for, regardless of what's open now.
+    const saved = await saveFinancialsCache(ticker, income, earnings, fxRates);
+
+    // Only touch the visible status if the user is still looking at this ticker (chart is already drawn above).
+    if(currentModalTicker === ticker && renderResult){
+      const {qCount, yCount, majorityCurrency, usingConversion, excludedTotal} = renderResult;
+      const curNote = usingConversion ? ' · USD로 환산됨' : (majorityCurrency ? ` · 통화: ${majorityCurrency}` : ' · 통화 정보 없음');
+      const exclNote = excludedTotal ? ` · ${excludedTotal}건 제외됨` : '';
+      if(saved){
+        statusEl.textContent = `완료 · 분기 ${qCount}개, 연간 ${yCount}개 반영${curNote}${exclNote} (Supabase에 저장됨)`;
+      }else{
+        statusEl.textContent = `차트는 표시되지만 저장에는 실패했습니다${curNote}${exclNote}${lastStorageError ? ` (오류: ${lastStorageError})` : ''}.`;
+      }
+    }
+  }catch(err){
+    if(currentModalTicker === ticker) statusEl.textContent = `실패: ${err.message}`;
+  }
+}
+
+/* ---------- Backup export / import (extra manual safety net alongside Supabase) ---------- */
+function exportBackup(){
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    categories,
+    portfolio,
+    extra: extraCache,
+    financials: financialsCache,
+    marketCap: marketCapCache,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.href = url;
+  a.download = `healthcare-portfolio-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function handleImportFile(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  let payload;
+  try{
+    const text = await file.text();
+    payload = JSON.parse(text);
+  }catch(e){
+    alert('파일을 읽지 못했습니다 — 올바른 백업 JSON 파일인지 확인해주세요.');
+    return;
+  }
+  if(!payload || typeof payload !== 'object'){
+    alert('올바른 백업 파일 형식이 아닙니다.');
+    return;
+  }
+  if(!confirm('가져오기를 하면 현재 화면의 데이터가 백업 파일 내용으로 전부 대체되고, Supabase에도 그대로 저장됩니다. 계속할까요?')){
+    return;
+  }
+
+  if(Array.isArray(payload.categories)) categories = payload.categories;
+  if(Array.isArray(payload.portfolio)) portfolio = payload.portfolio;
+  if(payload.extra && typeof payload.extra === 'object') extraCache = payload.extra;
+  if(payload.financials && typeof payload.financials === 'object') financialsCache = payload.financials;
+  if(payload.marketCap && typeof payload.marketCap === 'object') marketCapCache = payload.marketCap;
+
+  renderManagementUI();
+  buildAllStructure();
+  renderCategoryTabs();
+  renderEventCalendar();
+  if(currentModalTicker) closeModal();
+
+  await persist();
+  for(const ticker of Object.keys(extraCache)){
+    await saveExtra(ticker, extraCache[ticker]);
+  }
+  for(const ticker of Object.keys(financialsCache)){
+    const f = financialsCache[ticker];
+    await saveFinancialsCache(ticker, f.income, f.earnings, f.fxRates);
+  }
+  for(const ticker of Object.keys(marketCapCache)){
+    const m = marketCapCache[ticker];
+    await saveMarketCap(ticker, m.value, m.per, m.psr, m.pbr);
+  }
+
+  alert('가져오기가 완료됐고 Supabase에도 저장했습니다.');
+}
+
+/* ---------- Init ---------- */
+function showConnWarningBanner(msg){
+  hideConnWarningBanner();
+  const banner = document.createElement('div');
+  banner.id = 'storage-warning-banner';
+  banner.style.cssText = 'background:rgba(255,107,118,0.12);border:1px solid var(--neg);color:var(--neg);'
+    + 'border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;line-height:1.7;font-family:Inter,sans-serif;';
+  banner.innerHTML = `⚠️ <b>Supabase에 연결할 수 없습니다.</b> ${msg || 'URL과 키를 확인하고 "새로고침" 버튼을 눌러보세요.'}`;
+  const wrap = document.querySelector('.wrap');
+  if(wrap) wrap.insertBefore(banner, wrap.firstChild);
+}
+function hideConnWarningBanner(){
+  const el = document.getElementById('storage-warning-banner');
+  if(el) el.remove();
+}
+
+async function loadAllDataFromSupabase(){
+  const statusText = document.getElementById('status-text');
+  statusText.textContent = 'Supabase에서 데이터 불러오는 중…';
+
+  const connected = await checkSupabaseConnection();
+  if(!connected){
+    showConnWarningBanner('URL/키가 올바른지, 01_schema_setup.sql을 실행해 테이블을 만들었는지 확인해주세요.');
+    statusText.textContent = 'Supabase 연결 실패';
+    return;
+  }
+  hideConnWarningBanner();
+
+  const [savedTd, savedAv, savedGemini] = await Promise.all([
+    loadApiKey('td_api_key'), loadApiKey('av_api_key'), loadApiKey('gemini_api_key')
+  ]);
+  if(savedTd) document.getElementById('td-key').value = savedTd;
+  if(savedAv) document.getElementById('av-key').value = savedAv;
+  if(savedGemini) document.getElementById('gemini-key').value = savedGemini;
+
+  const [catRows, compRows, mapRows] = await Promise.all([
+    sbGet('hc_categories', 'select=*'),
+    sbGet('hc_companies', 'select=*'),
+    sbGet('hc_company_categories', 'select=*'),
+  ]);
+  categories = (catRows || []).map(c => ({id: c.id, name: c.name}));
+  const catsByTicker = {};
+  (mapRows || []).forEach(m => { (catsByTicker[m.ticker] = catsByTicker[m.ticker] || []).push(m.category_id); });
+  portfolio = (compRows || []).map(c => ({ticker: c.ticker, name: c.name, categories: catsByTicker[c.ticker] || []}));
+
+  marketCapCache = {}; financialsCache = {}; extraCache = {};
+  await loadMarketCapsFromStorage();
+
+  // Load each company's pipeline + events. Sequential to keep things simple and
+  // gentle on the API; the number of companies here is small enough that this is fast.
+  for(const p of portfolio){
+    await loadExtra(p.ticker);
+  }
+
+  renderManagementUI();
+  buildAllStructure();
+  renderCategoryTabs();
+  renderEventCalendar();
+
+  statusText.textContent = 'API 키 입력 대기 중';
+}
+
+async function refreshAllFromSupabase(){
+  if(currentModalTicker) closeModal();
+  await loadAllDataFromSupabase();
+}
+
+async function init(){
+  await loadAllDataFromSupabase();
+}
+init();
+</script>
+</body>
+</html>
