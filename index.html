@@ -200,15 +200,15 @@
   <div class="key-row">
     <div class="key-box">
       <label>Twelve Data 키 (주가)</label>
-      <input type="text" id="td-key" placeholder="Twelve Data API 키" autocomplete="off">
+      <input type="text" id="td-key" placeholder="Twelve Data API 키" autocomplete="off" onchange="saveApiKey('td_api_key', this.value)">
     </div>
     <div class="key-box">
       <label>Alpha Vantage 키 (매출/EPS)</label>
-      <input type="text" id="av-key" placeholder="Alpha Vantage API 키" autocomplete="off">
+      <input type="text" id="av-key" placeholder="Alpha Vantage API 키" autocomplete="off" onchange="saveApiKey('av_api_key', this.value)">
     </div>
     <div class="key-box">
       <label>Gemini 키 (이미지 인식)</label>
-      <input type="text" id="gemini-key" placeholder="Google Gemini API 키" autocomplete="off">
+      <input type="text" id="gemini-key" placeholder="Google Gemini API 키" autocomplete="off" onchange="saveApiKey('gemini_api_key', this.value)">
     </div>
   </div>
 
