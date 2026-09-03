@@ -636,6 +636,26 @@ async function addCompany(){
   renderCategoryTabs();
   buildAllStructure();
   renderEventCalendar();
+
+  // Fetch just this ticker's price + valuation instead of forcing a full portfolio re-fetch.
+  if(isNew){
+    const tdKey = document.getElementById('td-key').value.trim();
+    if(tdKey){
+      log(`${ticker} 주가만 새로 가져오는 중… (다른 종목은 건드리지 않습니다)`);
+      const ok = await fetchPriceForTicker(ticker);
+      if(ok){
+        fillRow(ticker, ticker, name, seriesCache[ticker], null);
+        checked.forEach(catId => fillRow(`${catId}-${ticker}`, ticker, name, seriesCache[ticker], null));
+        renderAllChart();
+        checked.forEach(catId => renderCategoryChart(catId));
+      }
+    }
+    const avKey = document.getElementById('av-key').value.trim();
+    if(avKey){
+      log(`${ticker} 시가총액·밸류에이션만 새로 가져오는 중…`);
+      await fetchMarketCapForTicker(ticker, avKey);
+    }
+  }
 }
 
 async function deleteCompany(ticker){
@@ -829,6 +849,27 @@ function fmtRatio(v){
   return n.toFixed(2);
 }
 
+// Fetches and saves ONE ticker's market cap/PER/PSR/PBR — used when adding a single
+// new company, so that doesn't force a full re-fetch of the whole portfolio.
+async function fetchMarketCapForTicker(ticker, avKey){
+  try{
+    const overview = await fetchAV('OVERVIEW', ticker, avKey);
+    const cap = overview.MarketCapitalization;
+    const per = overview.PERatio, psr = overview.PriceToSalesRatioTTM, pbr = overview.PriceToBookRatio;
+    if(cap && cap !== 'None'){
+      await saveMarketCap(ticker, cap, per, psr, pbr);
+      updateMarketCapCells(ticker, cap, per, psr, pbr);
+      log(`${ticker} 시가총액·밸류에이션 저장 완료`, 'ok');
+      return true;
+    }
+    log(`${ticker}: 시가총액 데이터 없음`, 'fail');
+    return false;
+  }catch(e){
+    log(`${ticker} 시가총액·밸류에이션 조회 실패: ${e.message}`, 'fail');
+    return false;
+  }
+}
+
 async function fetchMarketCaps(){
   const avKey = document.getElementById('av-key').value.trim();
   const btn = document.getElementById('mcap-btn');
@@ -840,17 +881,7 @@ async function fetchMarketCaps(){
   for(let i=0;i<symbols.length;i++){
     const sym = symbols[i];
     btn.textContent = `시가총액·밸류에이션 가져오는 중… (${i+1}/${symbols.length})`;
-    try{
-      const overview = await fetchAV('OVERVIEW', sym, avKey);
-      const cap = overview.MarketCapitalization;
-      const per = overview.PERatio, psr = overview.PriceToSalesRatioTTM, pbr = overview.PriceToBookRatio;
-      if(cap && cap !== 'None'){
-        await saveMarketCap(sym, cap, per, psr, pbr);
-        updateMarketCapCells(sym, cap, per, psr, pbr);
-      }
-    }catch(e){
-      console.error('시가총액·밸류에이션 조회 실패:', sym, e.message);
-    }
+    await fetchMarketCapForTicker(sym, avKey);
     if(i < symbols.length-1) await sleep(15000);
   }
   btn.disabled = false;
@@ -893,6 +924,33 @@ async function fetchChunkWithRetry(c, apikey, label){
     data = await fetchBatch(c, apikey);
   }
   return data;
+}
+
+// Fetches and saves just ONE ticker's price series — used when adding a single new
+// company, so that doesn't force a full re-fetch of the whole portfolio.
+async function fetchPriceForTicker(ticker){
+  const tdKey = document.getElementById('td-key').value.trim();
+  if(!tdKey) return false;
+  try{
+    const entry = await fetchChunkWithRetry([ticker], tdKey, ticker);
+    if(!entry || entry.status === 'error' || !entry.values){
+      log(`${ticker}: ${(entry && entry.message) || '데이터 없음'}`, 'fail');
+      return false;
+    }
+    const series = parseSeries(entry.values);
+    if(series.length < 2){ log(`${ticker}: 종가 부족`, 'fail'); return false; }
+    seriesCache[ticker] = series;
+    const saved = await sbUpsert('hc_prices', {
+      ticker,
+      series: series.map(p => ({date: p.date.toISOString().slice(0,10), close: p.close})),
+      fetched_at: new Date().toISOString(),
+    }, 'ticker', 300000);
+    log(`${ticker} 주가 저장 ${saved ? '완료' : '실패'}`, saved ? 'ok' : 'fail');
+    return true;
+  }catch(e){
+    log(`${ticker} 주가 조회 실패: ${e.message}`, 'fail');
+    return false;
+  }
 }
 
 async function loadAllPrices(){
