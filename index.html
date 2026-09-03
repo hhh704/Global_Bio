@@ -605,6 +605,7 @@ async function addCategory(){
   await persist();
   renderManagementUI();
   renderCategoryTabs();
+  renderAllCachedPrices();
 }
 
 async function deleteCategory(id){
@@ -613,6 +614,7 @@ async function deleteCategory(id){
   await sbDelete('hc_categories', `id=eq.${encodeURIComponent(id)}`); // cascades to hc_company_categories
   renderManagementUI();
   renderCategoryTabs();
+  renderAllCachedPrices();
 }
 
 async function addCompany(){
@@ -636,6 +638,7 @@ async function addCompany(){
   renderCategoryTabs();
   buildAllStructure();
   renderEventCalendar();
+  renderAllCachedPrices(); // rebuilding the table above reset every row to "loading" — restore what we already have
 
   // Fetch just this ticker's price + valuation instead of forcing a full portfolio re-fetch.
   if(isNew){
@@ -664,10 +667,12 @@ async function deleteCompany(ticker){
   delete extraCache[ticker];
   delete marketCapCache[ticker];
   delete financialsCache[ticker];
+  delete seriesCache[ticker];
   renderManagementUI();
   renderCategoryTabs();
   buildAllStructure();
   renderEventCalendar();
+  renderAllCachedPrices(); // rebuilding the table above reset every row to "loading" — restore what we already have
 }
 
 /* ---------- Skeleton / structure ---------- */
@@ -694,6 +699,19 @@ function renderSkeletonRow(rowId, displayTkr, label){
 
 function buildAllStructure(){
   document.getElementById('all-tbody').innerHTML = portfolio.map(p => renderSkeletonRow(p.ticker, p.ticker, p.name)).join('');
+}
+
+// buildAllStructure()/renderCategoryTabs() rebuild the table from scratch as loading
+// skeletons, which would wipe out prices we already have in memory for other tickers
+// (e.g. right after adding or deleting one company). Call this afterward to restore them.
+function renderAllCachedPrices(){
+  portfolio.forEach(p => {
+    if(!seriesCache[p.ticker]) return;
+    fillRow(p.ticker, p.ticker, p.name, seriesCache[p.ticker], null);
+    p.categories.forEach(catId => fillRow(`${catId}-${p.ticker}`, p.ticker, p.name, seriesCache[p.ticker], null));
+  });
+  renderAllChart();
+  categories.forEach(c => renderCategoryChart(c.id));
 }
 
 function renderCategoryTabs(){
