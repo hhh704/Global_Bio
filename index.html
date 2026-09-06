@@ -2188,7 +2188,7 @@ async function translateNewsItem(ticker, index){
 제목: ${article.headline}
 요약: ${article.summary || ''}`;
 
-  const modelCandidates = ['gemini-flash-latest', 'gemini-2.5-flash'];
+  const modelCandidates = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
   let translated = null, lastErr = null;
   for(const modelName of modelCandidates){
     try{
