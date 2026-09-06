@@ -207,8 +207,12 @@
       <input type="text" id="av-key" placeholder="Alpha Vantage API 키" autocomplete="off" onchange="saveApiKey('av_api_key', this.value)">
     </div>
     <div class="key-box">
-      <label>Gemini 키 (이미지 인식)</label>
+      <label>Gemini 키 (이미지 인식·번역)</label>
       <input type="text" id="gemini-key" placeholder="Google Gemini API 키" autocomplete="off" onchange="saveApiKey('gemini_api_key', this.value)">
+    </div>
+    <div class="key-box">
+      <label>Finnhub 키 (뉴스)</label>
+      <input type="text" id="finnhub-key" placeholder="Finnhub API 키" autocomplete="off" onchange="saveApiKey('finnhub_api_key', this.value)">
     </div>
   </div>
 
@@ -359,6 +363,11 @@
       <button class="btn-primary" id="event-submit-btn" onclick="submitEvent()">이벤트 추가</button>
       <button class="small" id="event-cancel-btn" onclick="cancelEventEdit()" style="display:none;">취소</button>
     </div>
+
+    <div class="modal-section-title">주요 뉴스</div>
+    <div id="news-status" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:10px;">불러오려면 아래 버튼을 누르세요.</div>
+    <button class="small" onclick="loadNews()">뉴스 가져오기 (Finnhub)</button>
+    <div id="news-list" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 </div>
 
@@ -668,6 +677,7 @@ async function deleteCompany(ticker){
   delete marketCapCache[ticker];
   delete financialsCache[ticker];
   delete seriesCache[ticker];
+  delete newsCache[ticker];
   renderManagementUI();
   renderCategoryTabs();
   buildAllStructure();
@@ -1302,6 +1312,7 @@ async function openModal(ticker){
     const c = window[`__modal_${id}`]; if(c){ c.destroy(); window[`__modal_${id}`]=null; }
   });
   await loadFinancialsFromCacheIfAny(ticker);
+  await loadNewsFromCacheIfAny(ticker);
 }
 function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); currentModalTicker=null; }
 
@@ -2068,6 +2079,150 @@ async function loadFinancials(){
   }
 }
 
+/* ---------- News (Finnhub) + per-item translation (Gemini) ---------- */
+let newsCache = {}; // ticker -> {articles, fetchedAt} — mirrors Supabase in memory, same pattern as financialsCache
+
+async function getNewsCache(ticker){
+  if(newsCache[ticker]) return newsCache[ticker];
+  const rows = await sbGet('hc_news', `ticker=eq.${encodeURIComponent(ticker)}&select=*`);
+  if(!rows || !rows[0]) return null;
+  const parsed = {articles: rows[0].articles || [], fetchedAt: rows[0].fetched_at ? new Date(rows[0].fetched_at).getTime() : Date.now()};
+  newsCache[ticker] = parsed;
+  return parsed;
+}
+async function saveNewsCache(ticker, articles){
+  const data = {articles, fetchedAt: Date.now()};
+  newsCache[ticker] = data; // update memory immediately
+  return await sbUpsert('hc_news', {ticker, articles, fetched_at: new Date(data.fetchedAt).toISOString()}, 'ticker', 300000);
+}
+
+function fmtNewsDate(unixSeconds){
+  if(!unixSeconds) return '';
+  return new Date(unixSeconds * 1000).toLocaleDateString('ko-KR', {year:'numeric', month:'2-digit', day:'2-digit'});
+}
+
+function renderNewsList(ticker, articles){
+  const box = document.getElementById('news-list');
+  if(!articles || !articles.length){
+    box.innerHTML = `<div style="font-size:12px;color:var(--text-faint);">표시할 뉴스가 없습니다.</div>`;
+    return;
+  }
+  box.innerHTML = articles.map((a, i) => `
+    <div class="company-row" style="flex-direction:column;align-items:stretch;gap:4px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+        <a href="${a.url}" target="_blank" rel="noopener" style="color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;text-decoration:none;flex:1;">${a.headline}</a>
+        <button class="small" onclick="translateNewsItem('${ticker}', ${i})" style="white-space:nowrap;">번역</button>
+      </div>
+      <div class="tags" style="margin-left:0;">${a.source || ''} · ${fmtNewsDate(a.datetime)}</div>
+      ${a.summary ? `<div style="font-size:12px;color:var(--text-dim);line-height:1.5;">${a.summary}</div>` : ''}
+      <div id="news-translated-${ticker}-${i}" style="font-size:12px;color:var(--teal);line-height:1.5;display:${a.translatedTitle ? 'block' : 'none'};">
+        ${a.translatedTitle ? `<b>${a.translatedTitle}</b><br>${a.translatedSummary || ''}` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadNewsFromCacheIfAny(ticker){
+  const cache = await getNewsCache(ticker);
+  const statusEl = document.getElementById('news-status');
+  if(!cache){
+    statusEl.textContent = '불러오려면 아래 버튼을 누르세요.';
+    document.getElementById('news-list').innerHTML = '';
+    return;
+  }
+  renderNewsList(ticker, cache.articles);
+  const when = new Date(cache.fetchedAt).toLocaleString('ko-KR', {hour12:false});
+  statusEl.textContent = `저장된 뉴스 표시 중 (${when} 기준, ${cache.articles.length}건) — 최신 소식이 필요하면 아래 버튼을 다시 눌러주세요.`;
+}
+
+async function loadNews(){
+  const ticker = currentModalTicker; // pin the ticker in case the modal switches mid-fetch
+  if(!ticker) return;
+  const finnhubKey = document.getElementById('finnhub-key').value.trim();
+  const statusEl = document.getElementById('news-status');
+  if(!finnhubKey){ statusEl.textContent = 'Finnhub API 키를 상단에 입력하세요.'; return; }
+  await saveApiKey('finnhub_api_key', finnhubKey);
+
+  if(currentModalTicker === ticker) statusEl.textContent = `${ticker} 뉴스 가져오는 중…`;
+  try{
+    const to = new Date();
+    const from = new Date(to.getTime() - 30*24*60*60*1000); // last 30 days
+    const fmt = d => d.toISOString().slice(0,10);
+    const url = `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(ticker)}&from=${fmt(from)}&to=${fmt(to)}&token=${encodeURIComponent(finnhubKey)}`;
+    const res = await fetch(url, {cache:'no-store'});
+    if(!res.ok) throw new Error(`Finnhub HTTP ${res.status}`);
+    const raw = await res.json();
+    if(!Array.isArray(raw)) throw new Error((raw && raw.error) || '알 수 없는 응답 형식');
+
+    const articles = raw.slice(0, 15).map(a => ({
+      headline: a.headline, summary: a.summary, url: a.url, source: a.source, datetime: a.datetime,
+    }));
+
+    if(currentModalTicker === ticker) renderNewsList(ticker, articles);
+
+    const saved = await saveNewsCache(ticker, articles);
+    if(currentModalTicker === ticker){
+      statusEl.textContent = saved
+        ? `완료 · ${articles.length}건 반영 (Supabase에 저장됨)`
+        : `표시는 됐지만 저장에는 실패했습니다${lastStorageError ? ` (오류: ${lastStorageError})` : ''}.`;
+    }
+  }catch(err){
+    if(currentModalTicker === ticker) statusEl.textContent = `실패: ${err.message}`;
+  }
+}
+
+async function translateNewsItem(ticker, index){
+  const geminiKey = document.getElementById('gemini-key').value.trim();
+  if(!geminiKey){ alert('Gemini API 키를 상단에 입력하세요.'); return; }
+  await saveApiKey('gemini_api_key', geminiKey);
+
+  const cache = newsCache[ticker];
+  if(!cache || !cache.articles[index]) return;
+  const article = cache.articles[index];
+  const targetDiv = document.getElementById(`news-translated-${ticker}-${index}`);
+  if(targetDiv){ targetDiv.style.display = 'block'; targetDiv.textContent = '번역 중…'; }
+
+  const prompt = `다음 영어 뉴스 제목과 요약을 자연스러운 한국어로 번역해줘. 다른 설명 없이 JSON으로만 응답해:
+{"title": "번역된 제목", "summary": "번역된 요약"}
+
+제목: ${article.headline}
+요약: ${article.summary || ''}`;
+
+  const modelCandidates = ['gemini-flash-latest', 'gemini-2.5-flash'];
+  let translated = null, lastErr = null;
+  for(const modelName of modelCandidates){
+    try{
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(geminiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [{parts: [{text: prompt}]}],
+          generationConfig: {response_mime_type: 'application/json'},
+        }),
+      });
+      const json = await res.json();
+      if(json.error){ lastErr = json.error.message; continue; }
+      const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      if(!rawText){ lastErr = '응답을 이해하지 못했습니다.'; continue; }
+      translated = JSON.parse(rawText.replace(/^```json\s*|```\s*$/g, '').trim());
+      break;
+    }catch(e){ lastErr = e.message; }
+  }
+
+  if(!translated){
+    if(targetDiv) targetDiv.textContent = `번역 실패: ${lastErr || '알 수 없는 오류'}`;
+    return;
+  }
+
+  article.translatedTitle = translated.title || '';
+  article.translatedSummary = translated.summary || '';
+  if(targetDiv) targetDiv.innerHTML = `<b>${article.translatedTitle}</b><br>${article.translatedSummary}`;
+
+  // Persist the translation so it doesn't need to be redone next time this news list loads.
+  await saveNewsCache(ticker, cache.articles);
+}
+
 /* ---------- Backup export / import (extra manual safety net alongside Supabase) ---------- */
 function exportBackup(){
   const payload = {
@@ -2078,6 +2233,7 @@ function exportBackup(){
     extra: extraCache,
     financials: financialsCache,
     marketCap: marketCapCache,
+    news: newsCache,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -2116,6 +2272,7 @@ async function handleImportFile(event){
   if(payload.extra && typeof payload.extra === 'object') extraCache = payload.extra;
   if(payload.financials && typeof payload.financials === 'object') financialsCache = payload.financials;
   if(payload.marketCap && typeof payload.marketCap === 'object') marketCapCache = payload.marketCap;
+  if(payload.news && typeof payload.news === 'object') newsCache = payload.news;
 
   renderManagementUI();
   buildAllStructure();
@@ -2134,6 +2291,9 @@ async function handleImportFile(event){
   for(const ticker of Object.keys(marketCapCache)){
     const m = marketCapCache[ticker];
     await saveMarketCap(ticker, m.value, m.per, m.psr, m.pbr);
+  }
+  for(const ticker of Object.keys(newsCache)){
+    await saveNewsCache(ticker, newsCache[ticker].articles || []);
   }
 
   alert('가져오기가 완료됐고 Supabase에도 저장했습니다.');
@@ -2167,12 +2327,13 @@ async function loadAllDataFromSupabase(){
   }
   hideConnWarningBanner();
 
-  const [savedTd, savedAv, savedGemini] = await Promise.all([
-    loadApiKey('td_api_key'), loadApiKey('av_api_key'), loadApiKey('gemini_api_key')
+  const [savedTd, savedAv, savedGemini, savedFinnhub] = await Promise.all([
+    loadApiKey('td_api_key'), loadApiKey('av_api_key'), loadApiKey('gemini_api_key'), loadApiKey('finnhub_api_key')
   ]);
   if(savedTd) document.getElementById('td-key').value = savedTd;
   if(savedAv) document.getElementById('av-key').value = savedAv;
   if(savedGemini) document.getElementById('gemini-key').value = savedGemini;
+  if(savedFinnhub) document.getElementById('finnhub-key').value = savedFinnhub;
 
   const [catRows, compRows, mapRows] = await Promise.all([
     sbGet('hc_categories', 'select=*'),
@@ -2184,7 +2345,7 @@ async function loadAllDataFromSupabase(){
   (mapRows || []).forEach(m => { (catsByTicker[m.ticker] = catsByTicker[m.ticker] || []).push(m.category_id); });
   portfolio = (compRows || []).map(c => ({ticker: c.ticker, name: c.name, categories: catsByTicker[c.ticker] || []}));
 
-  marketCapCache = {}; financialsCache = {}; extraCache = {};
+  marketCapCache = {}; financialsCache = {}; extraCache = {}; newsCache = {};
   await loadMarketCapsFromStorage();
 
   // Load each company's pipeline + events. Sequential to keep things simple and
