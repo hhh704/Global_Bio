@@ -295,6 +295,11 @@
       <canvas id="modal-price-chart"></canvas>
     </div>
     <div id="modal-price-chart-status" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint);margin:6px 0 4px;"></div>
+    <button class="small" onclick="refreshThisTickerPrice()">이 종목만 주가 새로고침 (Twelve Data)</button>
+
+    <div class="modal-section-title">시가총액 · PER · PSR · PBR</div>
+    <div id="modal-marketdata-status" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:10px;">-</div>
+    <button class="small" onclick="refreshThisTickerMarketData()">이 종목만 시가총액·밸류에이션 새로고침 (Alpha Vantage)</button>
 
     <div class="modal-section-title">매출 &amp; EPS</div>
     <div id="modal-financials-status" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:10px;">불러오려면 아래 버튼을 누르세요.</div>
@@ -981,6 +986,62 @@ async function fetchPriceForTicker(ticker){
   }
 }
 
+// Modal button handler: refresh just the ticker currently open, without touching
+// (or waiting on) the rest of the portfolio. This is the escape hatch for the
+// daily API limits — you only spend quota on the company you're actually looking at.
+async function refreshThisTickerPrice(){
+  const ticker = currentModalTicker;
+  if(!ticker) return;
+  const tdKey = document.getElementById('td-key').value.trim();
+  if(!tdKey){ alert('Twelve Data API 키를 상단에 입력하세요.'); return; }
+  await saveApiKey('td_api_key', tdKey);
+
+  const statusEl = document.getElementById('modal-price-chart-status');
+  if(currentModalTicker === ticker) statusEl.textContent = `${ticker} 주가 가져오는 중…`;
+  const ok = await fetchPriceForTicker(ticker);
+  if(currentModalTicker !== ticker) return; // user moved on to a different company meanwhile
+  if(ok){
+    renderModalPriceChart(ticker);
+    const p = portfolio.find(x=>x.ticker===ticker);
+    if(p){
+      fillRow(ticker, ticker, p.name, seriesCache[ticker], null);
+      p.categories.forEach(catId => fillRow(`${catId}-${ticker}`, ticker, p.name, seriesCache[ticker], null));
+      renderAllChart();
+      p.categories.forEach(catId => renderCategoryChart(catId));
+      const r = computeReturns(seriesCache[ticker]);
+      document.getElementById('modal-sub').textContent = `현재가 ${fmtPx(r.price)} · 일간 ${fmtPct(r.daily).text}`;
+    }
+  }else{
+    statusEl.textContent = `${ticker} 주가를 가져오지 못했습니다 — 위 요청 로그를 확인해주세요.`;
+  }
+}
+
+function renderModalMarketDataStatus(ticker){
+  const statusEl = document.getElementById('modal-marketdata-status');
+  const m = getMarketCapCache(ticker);
+  if(!m){ statusEl.textContent = '아직 가져온 적 없음.'; return; }
+  const when = m.fetchedAt ? new Date(m.fetchedAt).toLocaleString('ko-KR', {hour12:false}) : '';
+  statusEl.textContent = `시가총액 ${fmtMarketCapUSD(m.value)} · PER ${fmtRatio(m.per)} · PSR ${fmtRatio(m.psr)} · PBR ${fmtRatio(m.pbr)}${when ? ` (${when} 기준)` : ''}`;
+}
+
+async function refreshThisTickerMarketData(){
+  const ticker = currentModalTicker;
+  if(!ticker) return;
+  const avKey = document.getElementById('av-key').value.trim();
+  if(!avKey){ alert('Alpha Vantage API 키를 상단에 입력하세요.'); return; }
+  await saveApiKey('av_api_key', avKey);
+
+  const statusEl = document.getElementById('modal-marketdata-status');
+  if(currentModalTicker === ticker) statusEl.textContent = `${ticker} 시가총액·밸류에이션 가져오는 중…`;
+  const ok = await fetchMarketCapForTicker(ticker, avKey);
+  if(currentModalTicker !== ticker) return; // user moved on to a different company meanwhile
+  if(ok){
+    renderModalMarketDataStatus(ticker);
+  }else{
+    statusEl.textContent = `${ticker} 데이터를 가져오지 못했습니다 — 위 요청 로그를 확인해주세요.`;
+  }
+}
+
 async function loadAllPrices(){
   const tdKey = document.getElementById('td-key').value.trim();
   const dot = document.getElementById('status-dot');
@@ -1295,6 +1356,7 @@ async function openModal(ticker){
   const r = seriesCache[ticker] ? computeReturns(seriesCache[ticker]) : null;
   document.getElementById('modal-sub').textContent = r ? `현재가 ${fmtPx(r.price)} · 일간 ${fmtPct(r.daily).text}` : '주가 데이터를 먼저 가져와주세요.';
   renderModalPriceChart(ticker);
+  renderModalMarketDataStatus(ticker);
 
   if(!extraCache[ticker]) await loadExtra(ticker);
   const extra = getExtra(ticker);
