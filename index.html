@@ -66,6 +66,8 @@
     border-radius:999px;padding:5px 6px 5px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;}
   .chip button{padding:2px 6px;border-radius:999px;font-size:11px;background:transparent;border:none;color:var(--neg);}
   .chip button:hover{background:var(--neg-bg);}
+  .chip button.edit-btn{color:var(--teal);}
+  .chip button.edit-btn:hover{background:rgba(45,212,191,0.12);}
 
   .add-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .add-form input[type=text]{background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;
@@ -594,7 +596,7 @@ function retCell(v){ const f = fmtPct(v); return `<td class="${f.cls}">${f.text}
 /* ---------- Management UI ---------- */
 function renderManagementUI(){
   document.getElementById('category-chips').innerHTML = categories.map(c => `
-    <span class="chip">${c.name}<button title="삭제" onclick="deleteCategory('${c.id}')">✕</button></span>
+    <span class="chip">${c.name}<button class="edit-btn" title="이름 변경" onclick="renameCategory('${c.id}')">✎</button><button title="삭제" onclick="deleteCategory('${c.id}')">✕</button></span>
   `).join('');
 
   document.getElementById('new-cat-checks').innerHTML = categories.map(c => `
@@ -616,6 +618,20 @@ async function addCategory(){
   const id = name.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').slice(0,30) + '_' + Date.now().toString(36).slice(-4);
   categories.push({id, name});
   input.value = '';
+  await persist();
+  renderManagementUI();
+  renderCategoryTabs();
+  renderAllCachedPrices();
+}
+
+async function renameCategory(id){
+  const cat = categories.find(c => c.id === id);
+  if(!cat) return;
+  const newName = prompt('새 카테고리 이름을 입력하세요.', cat.name);
+  if(newName === null) return; // cancelled
+  const trimmed = newName.trim();
+  if(!trimmed || trimmed === cat.name) return;
+  cat.name = trimmed;
   await persist();
   renderManagementUI();
   renderCategoryTabs();
