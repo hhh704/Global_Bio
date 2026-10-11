@@ -1920,6 +1920,36 @@ function detectYtdAnnualDate(annualList){
   return circular > 30 ? newest : null;
 }
 
+// Alpha Vantage's annualReports only contain COMPLETED fiscal years, so the in-progress year
+// has no annual row. Build it ourselves by summing the quarters reported since the latest
+// fiscal year-end (e.g. LLY FY2025 ended 2025-12-31, so "2026 YTD" = Q1 + Q2 2026).
+// Returns null (no bar) whenever the sum could be wrong, rather than showing a misleading number:
+//   - no quarters yet, or 4+ quarters (a full year Alpha Vantage just hasn't posted as annual)
+//   - any of those quarters was excluded earlier (currency mismatch / no FX rate)
+//   - any quarter's revenue isn't a real number
+// qKeptReports must carry __usdRevenue (already converted to the chart currency).
+function computeYtdRevenue(income, qKeptReports){
+  const annualDates = (income.annualReports || []).map(r => r.fiscalDateEnding).filter(Boolean).sort();
+  if(!annualDates.length) return null;
+  const lastFyEnd = annualDates[annualDates.length - 1];
+  const cutoff = new Date(lastFyEnd).getTime() + 20 * 86400000; // 20-day buffer for 52/53-week year-end drift
+  if(isNaN(cutoff)) return null;
+  const after = r => r.fiscalDateEnding && new Date(r.fiscalDateEnding).getTime() > cutoff;
+
+  const rawQ = (income.quarterlyReports || []).filter(after);
+  if(rawQ.length < 1 || rawQ.length > 3) return null;
+  const keptQ = (qKeptReports || []).filter(after);
+  if(keptQ.length !== rawQ.length) return null;
+  const values = keptQ.map(r => r.__usdRevenue);
+  if(values.some(v => typeof v !== 'number' || !isFinite(v))) return null;
+
+  return {
+    label: `${parseInt(lastFyEnd.slice(0,4), 10) + 1} YTD`, // same year-labelling as the annual bars (fiscal year-end year)
+    total: values.reduce((a, b) => a + b, 0),
+    quarters: keptQ.length,
+  };
+}
+
 function miniBarChart(canvasId, labels, data, color, existingKey){
   const ctx = document.getElementById(canvasId);
   if(window[existingKey]) window[existingKey].destroy();
@@ -2054,9 +2084,15 @@ function renderFinancialsData(income, earnings, fxRatesByCurrency){
   }
 
   const qReports = qKeptReports.slice(0,8).reverse();
-  const yReports = yKeptReports.slice(0,5).reverse();
+  const ytdRev = computeYtdRevenue(income, qKeptReports);
+  // Keep 5 bars in total, like the annual EPS chart: 4 completed years + the YTD bar.
+  const yReports = yKeptReports.slice(0, ytdRev ? 4 : 5).reverse();
   miniBarChart('chart-rev-q', qReports.map(r=>r.fiscalDateEnding), qReports.map(r=>r.__usdRevenue/1e6), '#2DD4BF', '__modal_chart-rev-q');
-  miniBarChart('chart-rev-y', yReports.map(r=>r.fiscalDateEnding.slice(0,4)), yReports.map(r=>r.__usdRevenue/1e6), '#5B9DFF', '__modal_chart-rev-y');
+  miniBarChart('chart-rev-y',
+    [...yReports.map(r=>r.fiscalDateEnding.slice(0,4)), ...(ytdRev ? [ytdRev.label] : [])],
+    [...yReports.map(r=>r.__usdRevenue/1e6), ...(ytdRev ? [ytdRev.total/1e6] : [])],
+    [...yReports.map(() => '#5B9DFF'), ...(ytdRev ? ['rgba(91,157,255,0.40)'] : [])], // YTD bar is muted so it isn't read as a full year
+    '__modal_chart-rev-y');
 
   // EARNINGS entries don't carry their own reportedCurrency field, so infer each period's
   // currency from the matching INCOME_STATEMENT entry for the same fiscalDateEnding.
@@ -2096,14 +2132,16 @@ function renderFinancialsData(income, earnings, fxRatesByCurrency){
   const curLabel = usingConversion ? ' (백만 달러, 환산됨)' : (majorityCurrency ? ` (${majorityCurrency === 'USD' ? '백만 달러' : '백만 ' + majorityCurrency})` : '');
   const curLabelEps = usingConversion ? ' (USD, 환산됨)' : (majorityCurrency ? ` (${majorityCurrency})` : '');
   document.getElementById('label-rev-q').textContent = `최근 ${qReports.length}개 분기 매출${curLabel}` + (qExcluded ? ` — 환율 정보 없어 ${qExcluded}건 제외` : '');
-  document.getElementById('label-rev-y').textContent = `최근 ${yReports.length}개 연도 매출${curLabel}` + (yExcluded ? ` — 환율 정보 없어 ${yExcluded}건 제외` : '');
+  document.getElementById('label-rev-y').textContent = `최근 ${yReports.length + (ytdRev ? 1 : 0)}개 연도 매출${curLabel}`
+    + (ytdRev ? ` — ${ytdRev.label}는 올해 공시된 ${ytdRev.quarters}개 분기 누적값(연간 아님)` : '')
+    + (yExcluded ? ` — 환율 정보 없어 ${yExcluded}건 제외` : '');
   document.getElementById('label-eps-q').textContent = `최근 ${qEarn.length}개 분기 EPS${curLabelEps}` + (qEarnExcluded ? ` — 환율 정보 없어 ${qEarnExcluded}건 제외` : '');
   document.getElementById('label-eps-y').textContent = `최근 ${yEarn.length}개 연도 EPS${curLabelEps}`
     + (hasYtdBar ? ` — ${ytdDate.slice(0,4)} YTD는 올해 공시된 분기 누적값(연간 아님)` : '')
     + (yEarnExcluded ? ` — 환율 정보 없어 ${yEarnExcluded}건 제외` : '');
 
   return {
-    qCount: qReports.length, yCount: yReports.length,
+    qCount: qReports.length, yCount: yReports.length + (ytdRev ? 1 : 0),
     majorityCurrency, usingConversion,
     excludedTotal: qExcluded + yExcluded + qEarnExcluded + yEarnExcluded,
   };
