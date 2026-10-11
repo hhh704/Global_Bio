@@ -246,8 +246,8 @@
     <span class="section-note">일간 / 주간 / 월간 / 분기 / 반기 / 연간 / 올해(YTD) · 행을 클릭하면 상세 정보</span>
   </div>
   <div style="margin-bottom:12px;">
-    <button class="small" id="mcap-btn" onclick="fetchMarketCaps()">시가총액·밸류에이션 가져오기 (Alpha Vantage)</button>
-    <span class="section-note" style="margin-left:8px;">종목당 15초 간격으로 순차 조회합니다 (API 한도 보호) · PER/PSR/PBR도 같은 요청으로 함께 가져옵니다</span>
+    <button class="small" id="mcap-btn" onclick="fetchMarketCaps()">시가총액·밸류에이션 가져오기 (Finnhub)</button>
+    <span class="section-note" style="margin-left:8px;">종목당 약 2~3초 간격으로 순차 조회합니다 (Finnhub 분당 60회 한도 보호) · PER·PSR은 최근 12개월(TTM), PBR은 최근 분기 기준</span>
   </div>
   <div class="table-scroll"><table>
     <thead><tr><th>종목</th><th>현재가</th><th>시가총액</th><th>PER</th><th>PSR</th><th>PBR</th><th>일간</th><th>주간</th><th>월간</th><th>분기</th><th>반기</th><th>연간</th><th>올해</th></tr></thead>
@@ -280,7 +280,7 @@
   <div class="log-box" id="log-box"></div>
 
   <div class="footer">
-    <p>주가는 Twelve Data(무료 티어: 분당 8크레딧, 심볼당 1크레딧)를 7개씩 배치로 나눠 65초 간격으로 가져옵니다. 매출/EPS/PER/PSR/PBR은 기업 상세를 열 때 Alpha Vantage에서 그때그때 가져옵니다. 카테고리·종목·파이프라인 이미지·주요 이벤트·매출/EPS는 전부 Supabase 데이터베이스에 저장되어, 브라우저나 기기를 바꿔도 그대로 유지됩니다.</p>
+    <p>주가는 Twelve Data(무료 티어: 분당 8크레딧, 심볼당 1크레딧)를 7개씩 배치로 나눠 65초 간격으로 가져옵니다. 매출/EPS는 Alpha Vantage, 시가총액·PER·PSR·PBR과 뉴스는 Finnhub에서 버튼을 눌렀을 때 가져옵니다. 카테고리·종목·파이프라인 이미지·주요 이벤트·매출/EPS는 전부 Supabase 데이터베이스에 저장되어, 브라우저나 기기를 바꿔도 그대로 유지됩니다.</p>
   </div>
 
 </div>
@@ -301,7 +301,7 @@
 
     <div class="modal-section-title">시가총액 · PER · PSR · PBR</div>
     <div id="modal-marketdata-status" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:10px;">-</div>
-    <button class="small" onclick="refreshThisTickerMarketData()">이 종목만 시가총액·밸류에이션 새로고침 (Alpha Vantage)</button>
+    <button class="small" onclick="refreshThisTickerMarketData()">이 종목만 시가총액·밸류에이션 새로고침 (Finnhub)</button>
 
     <div class="modal-section-title">매출 &amp; EPS</div>
     <div id="modal-financials-status" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:10px;">불러오려면 아래 버튼을 누르세요.</div>
@@ -683,10 +683,10 @@ async function addCompany(){
         checked.forEach(catId => renderCategoryChart(catId));
       }
     }
-    const avKey = document.getElementById('av-key').value.trim();
-    if(avKey){
-      log(`${ticker} 시가총액·밸류에이션만 새로 가져오는 중…`);
-      await fetchMarketCapForTicker(ticker, avKey);
+    const finnhubKey = document.getElementById('finnhub-key').value.trim();
+    if(finnhubKey){
+      log(`${ticker} 시가총액·밸류에이션만 새로 가져오는 중… (Finnhub)`);
+      await fetchMarketCapForTicker(ticker, finnhubKey);
     }
   }
 }
@@ -898,21 +898,60 @@ function fmtRatio(v){
   return n.toFixed(2);
 }
 
-// Fetches and saves ONE ticker's market cap/PER/PSR/PBR — used when adding a single
-// new company, so that doesn't force a full re-fetch of the whole portfolio.
-async function fetchMarketCapForTicker(ticker, avKey){
+// Finnhub GET helper. Throws a readable error for HTTP failures and for the
+// {"error": "..."} bodies Finnhub returns (bad key, no access to a resource, etc.).
+async function fetchFinnhub(path, params, token){
+  const qs = new URLSearchParams({...params, token}).toString();
+  const res = await fetch(`https://finnhub.io/api/v1/${path}?${qs}`, {cache:'no-store'});
+  let json = null;
+  try{ json = await res.json(); }catch(e){ /* non-JSON body */ }
+  if(!res.ok){
+    const msg = (json && json.error) ? json.error : '';
+    if(res.status === 429) throw new Error('Finnhub 호출 한도(분당 60회)를 넘었습니다 — 잠시 후 다시 시도하세요.');
+    if(res.status === 401) throw new Error('Finnhub API 키가 올바르지 않습니다.');
+    throw new Error(`Finnhub HTTP ${res.status}${msg ? ` — ${msg}` : ''}`);
+  }
+  if(json && json.error) throw new Error(json.error);
+  return json || {};
+}
+function firstNumber(...vals){
+  for(const v of vals){
+    if(v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v))) return parseFloat(v);
+  }
+  return null;
+}
+
+// Fetches and saves ONE ticker's market cap / PER / PSR / PBR from Finnhub's free
+// endpoints (Alpha Vantage's OVERVIEW now returns a "premium endpoint" error for free keys).
+//   PER = trailing-twelve-month P/E   (peTTM)
+//   PSR = trailing-twelve-month P/S   (psTTM)
+//   PBR = latest-quarter P/B          (pbQuarterly)
+// Finnhub reports market cap in millions of USD; the rest of the dashboard stores raw dollars.
+async function fetchMarketCapForTicker(ticker, finnhubKey){
   try{
-    const overview = await fetchAV('OVERVIEW', ticker, avKey);
-    const cap = overview.MarketCapitalization;
-    const per = overview.PERatio, psr = overview.PriceToSalesRatioTTM, pbr = overview.PriceToBookRatio;
-    if(cap && cap !== 'None'){
-      await saveMarketCap(ticker, cap, per, psr, pbr);
-      updateMarketCapCells(ticker, cap, per, psr, pbr);
-      log(`${ticker} 시가총액·밸류에이션 저장 완료`, 'ok');
-      return true;
+    let profile = {}, metricRes = {}, profileErr = null;
+    try{
+      profile = await fetchFinnhub('stock/profile2', {symbol: ticker}, finnhubKey);
+    }catch(e){ profileErr = e; }
+    await sleep(1100); // stay well under Finnhub's free limit of 60 calls/minute
+    metricRes = await fetchFinnhub('stock/metric', {symbol: ticker, metric: 'all'}, finnhubKey);
+    const m = (metricRes && metricRes.metric) || {};
+
+    const capMillions = firstNumber(profile.marketCapitalization, m.marketCapitalization);
+    const prev = getMarketCapCache(ticker);
+    const cap = capMillions !== null ? capMillions * 1e6 : (prev ? prev.value : null); // keep the old cap if Finnhub has none
+    const per = firstNumber(m.peTTM, m.peBasicExclExtraTTM, m.peExclExtraTTM);
+    const psr = firstNumber(m.psTTM, m.psAnnual);
+    const pbr = firstNumber(m.pbQuarterly, m.pbAnnual);
+
+    if(cap === null && per === null && psr === null && pbr === null){
+      log(`${ticker}: Finnhub에 시가총액·밸류에이션 데이터가 없습니다${profileErr ? ` (${profileErr.message})` : ''}`, 'fail');
+      return false;
     }
-    log(`${ticker}: 시가총액 데이터 없음`, 'fail');
-    return false;
+    await saveMarketCap(ticker, cap, per, psr, pbr);
+    updateMarketCapCells(ticker, cap, per, psr, pbr);
+    log(`${ticker} 시가총액·밸류에이션 저장 완료 (Finnhub)`, 'ok');
+    return true;
   }catch(e){
     log(`${ticker} 시가총액·밸류에이션 조회 실패: ${e.message}`, 'fail');
     return false;
@@ -920,21 +959,21 @@ async function fetchMarketCapForTicker(ticker, avKey){
 }
 
 async function fetchMarketCaps(){
-  const avKey = document.getElementById('av-key').value.trim();
+  const finnhubKey = document.getElementById('finnhub-key').value.trim();
   const btn = document.getElementById('mcap-btn');
-  if(!avKey){ alert('Alpha Vantage API 키를 상단에 입력하세요.'); return; }
-  await saveApiKey('av_api_key', avKey);
+  if(!finnhubKey){ alert('Finnhub API 키를 상단에 입력하세요.'); return; }
+  await saveApiKey('finnhub_api_key', finnhubKey);
 
   const symbols = Array.from(new Set(portfolio.map(p=>p.ticker)));
   btn.disabled = true;
   for(let i=0;i<symbols.length;i++){
     const sym = symbols[i];
     btn.textContent = `시가총액·밸류에이션 가져오는 중… (${i+1}/${symbols.length})`;
-    await fetchMarketCapForTicker(sym, avKey);
-    if(i < symbols.length-1) await sleep(15000);
+    await fetchMarketCapForTicker(sym, finnhubKey);
+    if(i < symbols.length-1) await sleep(1200); // 2 calls per ticker + pauses ≈ 55 calls/min
   }
   btn.disabled = false;
-  btn.textContent = '시가총액·밸류에이션 가져오기 (Alpha Vantage)';
+  btn.textContent = '시가총액·밸류에이션 가져오기 (Finnhub)';
 }
 
 
@@ -1043,13 +1082,13 @@ function renderModalMarketDataStatus(ticker){
 async function refreshThisTickerMarketData(){
   const ticker = currentModalTicker;
   if(!ticker) return;
-  const avKey = document.getElementById('av-key').value.trim();
-  if(!avKey){ alert('Alpha Vantage API 키를 상단에 입력하세요.'); return; }
-  await saveApiKey('av_api_key', avKey);
+  const finnhubKey = document.getElementById('finnhub-key').value.trim();
+  if(!finnhubKey){ alert('Finnhub API 키를 상단에 입력하세요.'); return; }
+  await saveApiKey('finnhub_api_key', finnhubKey);
 
   const statusEl = document.getElementById('modal-marketdata-status');
   if(currentModalTicker === ticker) statusEl.textContent = `${ticker} 시가총액·밸류에이션 가져오는 중…`;
-  const ok = await fetchMarketCapForTicker(ticker, avKey);
+  const ok = await fetchMarketCapForTicker(ticker, finnhubKey);
   if(currentModalTicker !== ticker) return; // user moved on to a different company meanwhile
   if(ok){
     renderModalMarketDataStatus(ticker);
@@ -1861,6 +1900,26 @@ async function fetchAV(functionName, symbol, apikey){
   return json;
 }
 
+// Alpha Vantage's annualEarnings can include an in-progress year as its newest entry
+// (e.g. LLY "2026-09-30" = Q1+Q2 EPS only), which is not a real fiscal-year figure.
+// Detect it: the company's fiscal-year-end (month/day) is the most common one among the
+// older entries; if the newest entry's date is more than ~30 days away from it, the newest
+// entry is year-to-date rather than a completed year. Returns that entry's fiscalDateEnding, or null.
+function detectYtdAnnualDate(annualList){
+  const dates = (annualList || []).map(r => r.fiscalDateEnding).filter(Boolean).sort().reverse(); // newest first
+  if(dates.length < 2) return null;
+  const newest = dates[0];
+  const counts = {};
+  dates.slice(1).forEach(d => { const k = d.slice(5); counts[k] = (counts[k] || 0) + 1; });
+  let refKey = null, refCount = 0;
+  Object.keys(counts).forEach(k => { if(counts[k] > refCount){ refKey = k; refCount = counts[k]; } });
+  if(!refKey) return null;
+  const dayOfYear = md => { const [m, d] = md.split('-').map(Number); return Math.round((new Date(2001, m-1, d) - new Date(2001, 0, 1)) / 86400000); };
+  const diff = Math.abs(dayOfYear(newest.slice(5)) - dayOfYear(refKey));
+  const circular = Math.min(diff, 365 - diff);
+  return circular > 30 ? newest : null;
+}
+
 function miniBarChart(canvasId, labels, data, color, existingKey){
   const ctx = document.getElementById(canvasId);
   if(window[existingKey]) window[existingKey].destroy();
@@ -2025,14 +2084,23 @@ function renderFinancialsData(income, earnings, fxRatesByCurrency){
   const qEarn = qEarnReports.slice(0,8).reverse();
   const yEarn = yEarnReports.slice(0,5).reverse();
   miniBarChart('chart-eps-q', qEarn.map(r=>r.fiscalDateEnding), qEarn.map(r=>r.__usdEPS), '#F0B429', '__modal_chart-eps-q');
-  miniBarChart('chart-eps-y', yEarn.map(r=>r.fiscalDateEnding.slice(0,4)), yEarn.map(r=>r.__usdEPS), '#F2789F', '__modal_chart-eps-y');
+  const ytdDate = detectYtdAnnualDate(earnings.annualEarnings || []);
+  const isYtd = r => ytdDate && r.fiscalDateEnding === ytdDate;
+  const hasYtdBar = yEarn.some(isYtd);
+  miniBarChart('chart-eps-y',
+    yEarn.map(r => isYtd(r) ? `${r.fiscalDateEnding.slice(0,4)} YTD` : r.fiscalDateEnding.slice(0,4)),
+    yEarn.map(r => r.__usdEPS),
+    yEarn.map(r => isYtd(r) ? 'rgba(242,120,159,0.40)' : '#F2789F'), // YTD bar is muted so it isn't read as a full year
+    '__modal_chart-eps-y');
 
   const curLabel = usingConversion ? ' (백만 달러, 환산됨)' : (majorityCurrency ? ` (${majorityCurrency === 'USD' ? '백만 달러' : '백만 ' + majorityCurrency})` : '');
   const curLabelEps = usingConversion ? ' (USD, 환산됨)' : (majorityCurrency ? ` (${majorityCurrency})` : '');
   document.getElementById('label-rev-q').textContent = `최근 ${qReports.length}개 분기 매출${curLabel}` + (qExcluded ? ` — 환율 정보 없어 ${qExcluded}건 제외` : '');
   document.getElementById('label-rev-y').textContent = `최근 ${yReports.length}개 연도 매출${curLabel}` + (yExcluded ? ` — 환율 정보 없어 ${yExcluded}건 제외` : '');
   document.getElementById('label-eps-q').textContent = `최근 ${qEarn.length}개 분기 EPS${curLabelEps}` + (qEarnExcluded ? ` — 환율 정보 없어 ${qEarnExcluded}건 제외` : '');
-  document.getElementById('label-eps-y').textContent = `최근 ${yEarn.length}개 연도 EPS${curLabelEps}` + (yEarnExcluded ? ` — 환율 정보 없어 ${yEarnExcluded}건 제외` : '');
+  document.getElementById('label-eps-y').textContent = `최근 ${yEarn.length}개 연도 EPS${curLabelEps}`
+    + (hasYtdBar ? ` — ${ytdDate.slice(0,4)} YTD는 올해 공시된 분기 누적값(연간 아님)` : '')
+    + (yEarnExcluded ? ` — 환율 정보 없어 ${yEarnExcluded}건 제외` : '');
 
   return {
     qCount: qReports.length, yCount: yReports.length,
