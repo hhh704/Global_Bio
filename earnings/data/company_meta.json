@@ -1,0 +1,188 @@
+{
+ "ABBV": {
+  "label": "AbbVie",
+  "sort_order": 10,
+  "bucket_order": [
+   "Oncology",
+   "Immunology",
+   "Neuroscience",
+   "Eye Care",
+   "Aesthetics"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "AZN": {
+  "label": "AstraZeneca",
+  "sort_order": 20,
+  "bucket_order": [
+   "Oncology",
+   "Cardiovascular, Renal & Metabolism (CVRM)",
+   "Respiratory & Immunology (R&I)",
+   "Vaccines & Immune Therapies (V&I)",
+   "Rare Disease"
+  ],
+  "region_note": "제품 매출 기준 4개 권역"
+ },
+ "JNJ": {
+  "label": "J&J",
+  "sort_order": 30,
+  "bucket_order": [
+   "Oncology",
+   "Immunology",
+   "Neuroscience",
+   "Infectious Diseases",
+   "Pulmonary Hypertension",
+   "Cardiovascular / Metabolism / Other",
+   "MedTech",
+   "Consumer"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "MSD": {
+  "label": "Merck (MSD)",
+  "sort_order": 40,
+  "bucket_order": [
+   "Oncology",
+   "Vaccines",
+   "Infectious Diseases",
+   "Cardiometabolic & Respiratory",
+   "Diabetes",
+   "Animal Health"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "NOVN": {
+  "label": "Novartis",
+  "sort_order": 50,
+  "bucket_order": [
+   "Oncology",
+   "Cardiovascular, Renal and Metabolic",
+   "Immunology",
+   "Neuroscience",
+   "Established Medicines",
+   "Sandoz"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "PFE": {
+  "label": "Pfizer",
+  "sort_order": 60,
+  "bucket_order": [
+   "Oncology",
+   "Primary Care",
+   "Specialty Care",
+   "Hospital and Biosimilars",
+   "Business Innovation"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "NVO": {
+  "label": "Novo Nordisk",
+  "sort_order": 70,
+  "bucket_order": [
+   "Diabetes Care",
+   "Obesity Care",
+   "Rare Disease"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "LLY": {
+  "label": "Eli Lilly",
+  "sort_order": 80,
+  "bucket_order": [
+   "Cardiometabolic Health",
+   "Oncology",
+   "Immunology",
+   "Neuroscience"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "AMGN": {
+  "label": "Amgen",
+  "sort_order": 90,
+  "bucket_order": [
+   "Oncology",
+   "Inflammation",
+   "General Medicine",
+   "Rare Disease",
+   "Established Products"
+  ],
+  "region_note": "제품 매출 기준 미국 / 미국 외"
+ },
+ "GILD": {
+  "label": "Gilead Sciences",
+  "sort_order": 100,
+  "bucket_order": [
+   "HIV",
+   "Oncology",
+   "Liver Disease",
+   "Veklury",
+   "Other Products"
+  ],
+  "region_note": "제품 매출 기준 미국/유럽/기타 국제"
+ },
+ "BMY": {
+  "label": "Bristol Myers Squibb",
+  "sort_order": 110,
+  "bucket_order": [
+   "Oncology",
+   "Hematology",
+   "Immunology",
+   "Cardiovascular",
+   "Neuroscience",
+   "Other"
+  ],
+  "region_note": "미국 / 미국 외"
+ },
+ "GSK": {
+  "label": "GSK",
+  "sort_order": 120,
+  "bucket_order": [
+   "HIV",
+   "R&I&I",
+   "Oncology",
+   "Vaccines",
+   "GM_Resp",
+   "GM_Other"
+  ],
+  "region_note": "제품 매출 기준 미국/유럽/기타 국제"
+ },
+ "SAN": {
+  "label": "Sanofi",
+  "sort_order": 130,
+  "bucket_order": [
+   "Immunology",
+   "Rare Diseases",
+   "Neurology",
+   "Oncology",
+   "Vaccines",
+   "Other Pharma",
+   "Opella"
+  ],
+  "region_note": "제품 매출 기준 미국/유럽/기타 지역"
+ },
+ "ROP": {
+  "label": "Roche",
+  "sort_order": 140,
+  "bucket_order": [
+   "Oncology",
+   "Neurology",
+   "Immunology",
+   "Haemophilia A",
+   "Ophthalmology",
+   "Infectious Diseases",
+   "Other therapeutic",
+   "Diagnostics"
+  ],
+  "region_note": "제약·진단 사업부 합산 기준 미국 / 미국 외"
+ },
+ "ARGX": {
+  "label": "argenx",
+  "sort_order": 150,
+  "bucket_order": [
+   "VYVGART",
+   "Collaboration"
+  ],
+  "region_note": "비브가르트 매출 기준 미국/유럽/일본/기타 국가"
+ }
+}
