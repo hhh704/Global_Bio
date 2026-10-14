@@ -214,6 +214,16 @@ details.mk-all summary{cursor:pointer;color:var(--ink2);font-size:13px;padding:4
 #mkAllTbl tr.pr td:first-child{font-weight:500}
 @media (max-width:1000px){.mk-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.mk-rets{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:520px){.mk-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.mk-tile .v{font-size:18px}}
+
+#secRet{scroll-margin-top:72px}
+#retChips .chip[aria-disabled="true"]{opacity:.45;cursor:default}
+#retTbl th.s{cursor:pointer}
+#retTbl th.cur{color:var(--ink)}
+#retTbl td.nmc,#retTbl th.nmc{text-align:left}
+#retTbl tr.pr td:first-child{font-weight:500}
+#retChart svg text{font-size:11px}
+#tip .mk-up .tri{color:var(--pos)}#tip .mk-dn .tri{color:var(--neg)}
+#tip .r .mk-up,#tip .r .mk-dn{display:inline}
 </style>
 <script src="config.js"></script>
 </head>
@@ -277,6 +287,19 @@ details.mk-all summary{cursor:pointer;color:var(--ink2);font-size:13px;padding:4
       <div class="row"><label for="mkKeyFh">Finnhub</label><input id="mkKeyFh" type="password" autocomplete="off" placeholder="시총·밸류·뉴스용 키"></div>
       <div class="row"><button class="mk-btn" data-act="savekeys">저장</button><span class="x">이 브라우저에만 저장되며 Global_Bio 대시보드와 같은 칸을 씁니다. Global_Bio에서 이미 입력하셨다면 위 제목 옆에 ‘있음’으로 표시됩니다(보안상 키 값은 칸에 채우지 않습니다).</span></div>
     </details>
+  </section>
+
+  <section class="card sec" id="secRet" aria-label="기업 수익률 비교">
+    <div class="sec-h">
+      <div><h2>기업 수익률 비교</h2><p>비교할 기업을 고르면 선택한 기간의 시작일을 0%로 맞춰 주가 흐름과 기간별 수익률을 나란히 보여줍니다 · 최대 8개사 · 위 카드에서 가져온(저장된) 주가 기준</p></div>
+      <div class="seg" id="segRetRng" role="group" aria-label="비교 기간">
+        <button data-r="1M" aria-pressed="false">1개월</button><button data-r="3M" aria-pressed="false">3개월</button><button data-r="6M" aria-pressed="false">6개월</button><button data-r="YTD" aria-pressed="false">YTD</button><button data-r="1Y" aria-pressed="true">1년</button>
+      </div>
+    </div>
+    <div class="chips" id="retChips" role="group" aria-label="비교할 기업 선택"></div>
+    <div id="retChart"></div>
+    <div class="tbl-wrap"><table id="retTbl"></table></div>
+    <p class="mk-note" id="retNote"></p>
   </section>
 
 
@@ -427,7 +450,7 @@ async function boot(){
   S.co=CO_ORDER[0];
   setSrc('데이터: '+note+' · <a href="#" id="sbSet">연결 설정</a>');
   const a=document.getElementById('sbSet');if(a)a.addEventListener('click',ev=>{ev.preventDefault();sbSettings()});
-  mkInit();
+  mkInit();retInit();
   setup();
   mkLoad();
 }
@@ -793,7 +816,7 @@ function renderNotes(){
 /* ---------- tooltip ---------- */
 function tipMove(e){
   const tip=$('tip');
-  if(e.target.closest&&e.target.closest('#mkChart'))return;
+  if(e.target.closest&&e.target.closest('#mkChart,#retChart'))return;
   const el=e.target.closest&&e.target.closest('[data-k],[data-dk],[data-ck],.legend span');
   if(!el){tip.style.display='none';return}
   let html='';
@@ -1307,9 +1330,9 @@ function mkNiceTicks(lo,hi,n){
   for(let v=a;v<=hi+st*.001;v+=st)out.push(+v.toFixed(6));
   return out;
 }
-function mkRangeCut(last){
+function mkRangeCut(last,rg){
   const c=new Date(last);
-  switch(MK.range){case '1M':c.setMonth(c.getMonth()-1);break;case '3M':c.setMonth(c.getMonth()-3);break;case '6M':c.setMonth(c.getMonth()-6);break;
+  switch(rg||MK.range){case '1M':c.setMonth(c.getMonth()-1);break;case '3M':c.setMonth(c.getMonth()-3);break;case '6M':c.setMonth(c.getMonth()-6);break;
     case 'YTD':return new Date(last.getFullYear()-1,11,31);default:c.setFullYear(c.getFullYear()-1)}
   return c;
 }
@@ -1403,7 +1426,7 @@ function renderMkt(){
   document.querySelectorAll('#segMkRng button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.r===MK.range));
   $('mkTkSet').innerHTML=tk?'':`<div class="mk-tkset"><span class="x">이 기업의 미국 티커를 입력하세요</span><input id="mkTkIn" placeholder="예: MRK" aria-label="미국 티커"><button class="mk-btn" data-act="settk">저장</button></div>`;
   $('mkTiles').innerHTML=mkTiles(tk);
-  mkChart(tk);mkRets(tk);mkNews(tk);mkAll();
+  mkChart(tk);mkRets(tk);mkNews(tk);mkAll();renderRet();
   const pxAt=MK.px[tk]&&MK.px[tk].at;
   $('mkNote').innerHTML=`PER·PSR은 <b>최근 12개월(TTM)</b> 실적, PBR은 <b>최근 분기</b> 장부가를 기준으로 하며, 분자는 조회 시점의 주가(시가총액)입니다. 수익률은 마지막 종가를 각 기간 이전(주간 7일, 월간 1개월, 분기 3개월, 반기 6개월, 연간 12개월 전 또는 직전 거래일) 종가와 비교한 값이고 YTD는 전년 말 종가 대비입니다. 적자 기업은 PER이 –로 표시됩니다. ${pxAt?`주가 저장 시각 ${mkWhen(pxAt)}.`:''}`;
   const hasTd=!!mkKey('td_api_key'),hasFh=!!mkKey('finnhub_api_key');
@@ -1429,6 +1452,123 @@ function mkInit(){
   });
   root.addEventListener('keydown',e=>{if(e.key==='Enter'){const row=e.target.closest&&e.target.closest('[data-mkco]');if(row)row.click()}});
   // 기존에 저장된 키가 있으면 표시만(값 자체는 입력칸에 채우지 않음)
+}
+
+/* ================= 기업 수익률 비교 (선 차트 + 표) ================= */
+const RET_LS='earn_ret_v1',RET_MAX=8;
+const RET_KEY={'1M':'monthly','3M':'quarterly','6M':'half','YTD':'ytd','1Y':'annual'};
+const RET={sel:[],range:'1Y',sort:null};
+(function(){const s=lsGet(RET_LS);if(s){if(Array.isArray(s.sel))RET.sel=s.sel.filter(x=>x&&x.id&&Number.isInteger(x.slot)&&x.slot>=0&&x.slot<RET_MAX);if(RET_KEY[s.range])RET.range=s.range}})();
+function retSave(){lsSet(RET_LS,{sel:RET.sel,range:RET.range})}
+function retToggle(id){
+  const i=RET.sel.findIndex(s=>s.id===id);
+  if(i>=0)RET.sel.splice(i,1);
+  else{
+    if(RET.sel.length>=RET_MAX)return;
+    const used=new Set(RET.sel.map(s=>s.slot));let sl=0;while(used.has(sl))sl++;
+    RET.sel.push({id,slot:sl});
+  }
+  retSave();renderRet();
+}
+function retItems(){
+  return RET.sel.filter(s=>DATA[s.id]).map(s=>{const tk=usTicker(s.id),px=MK.px[tk];return{...s,tk,label:CO_LABEL[s.id],s:px?px.s:null,r:px?mkReturns(px.s):null}});
+}
+function retChart(items){
+  const el=$('retChart');
+  const have=items.filter(it=>it.s);
+  if(!items.length){el.innerHTML='<div class="empty">위에서 비교할 기업을 고르세요.</div>';return}
+  if(!have.length){el.innerHTML='<div class="empty">선택한 기업의 주가가 아직 없습니다. 위 “주가·밸류에이션” 카드의 “주가 새로고침”(또는 맨 아래 “전체 주가 가져오기”)으로 먼저 가져오세요.</div>';return}
+  const t1=Math.max(...have.map(it=>it.s[it.s.length-1].d.getTime()));
+  const cut=mkRangeCut(new Date(t1),RET.range),t0=cut.getTime();
+  const ser=have.map(it=>{
+    const base=mkBase(it.s,cut);
+    const pts=[{t:t0,p:0}].concat(it.s.filter(p=>p.d.getTime()>t0).map(p=>({t:p.d.getTime(),p:(p.c/base.c-1)*100})));
+    return{...it,pts};
+  }).filter(s=>s.pts.length>1);
+  if(!ser.length){el.innerHTML='<div class="empty">선택한 기간에 표시할 주가가 없습니다.</div>';return}
+  const W=chartWidth(el),H=W<520?250:320,dl=ser.length<=4;
+  const m={l:W<520?44:52,r:dl?(W<520?84:104):16,t:12,b:26};
+  const all=ser.flatMap(s=>s.pts.map(p=>p.p));
+  const lo0=Math.min(0,...all),hi0=Math.max(0,...all),pad=(hi0-lo0||2)*.06;
+  const ticks=mkNiceTicks(lo0-pad,hi0+pad,5),lo=ticks[0],hi=ticks[ticks.length-1];
+  const X=t=>m.l+(W-m.l-m.r)*(t-t0)/Math.max(1,t1-t0),Y=v=>m.t+(H-m.t-m.b)*(1-(v-lo)/(hi-lo||1));
+  const fp=v=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(Math.abs(v)<10&&ticks.length&&(ticks[1]-ticks[0])<1?1:0)+'%';
+  let g='';
+  ticks.forEach(tv=>{const y=Y(tv).toFixed(1),z=Math.abs(tv)<1e-9;g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="${z?'var(--ink3)':'var(--line)'}" ${z?'opacity=".6"':''}/><text x="${m.l-6}" y="${(+y+4).toFixed(1)}" text-anchor="end">${fp(tv)}</text>`});
+  const xs=[],span=(t1-t0)/864e5;
+  if(span>100){const months=Math.max(1,Math.round(span/30.4)),step=Math.max(1,Math.ceil(months/6));const d=new Date(cut.getFullYear(),cut.getMonth()+1,1);
+    for(let i=0;d.getTime()<=t1;d.setMonth(d.getMonth()+1),i++){if(i%step===0)xs.push({t:d.getTime(),l:String(d.getFullYear()).slice(2)+'.'+String(d.getMonth()+1).padStart(2,'0')})}}
+  else for(let i=0;i<=5;i++){const t=t0+(t1-t0)*i/5,d=new Date(t);xs.push({t,l:String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')})}
+  xs.forEach(x=>{g+=`<text x="${X(x.t).toFixed(1)}" y="${H-6}" text-anchor="middle">${x.l}</text>`});
+  let lines='',ends=[];
+  ser.forEach(s=>{
+    const d=s.pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.p).toFixed(1)).join('');
+    lines+=`<path d="${d}" fill="none" stroke="${slot(s.slot)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lp=s.pts[s.pts.length-1];ends.push({s,x:X(lp.t),y:Y(lp.p),v:lp.p});
+  });
+  let mks='',lbl='';
+  ends.forEach(e=>{mks+=mk(SHAPES[e.s.slot],e.x,e.y,4.5,slot(e.s.slot))});
+  if(dl){
+    const e2=ends.map(e=>({...e})).sort((a,b)=>a.y-b.y);
+    for(let i=1;i<e2.length;i++)if(e2[i].y-e2[i-1].y<14)e2[i].y=e2[i-1].y+14;
+    e2.forEach(e=>{lbl+=`<text x="${e.x+10}" y="${e.y+4}" style="fill:var(--ink2);font-size:11.5px">${esc(e.s.tk||e.s.label)} ${fp(e.v)}</text>`});
+  }
+  el.innerHTML=`<svg id="retSvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ser.map(s=>s.label+' '+fp(s.pts[s.pts.length-1].p)).join(', '))} (${RET.range} 수익률)" style="touch-action:pan-y">${g}${lines}${mks}${lbl}
+    <line id="retXh" y1="${m.t}" y2="${H-m.b}" stroke="var(--ink3)" stroke-dasharray="3 3" style="display:none"/><g id="retDots"></g>
+    <rect id="retHit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/></svg>`;
+  const svg=$('retSvg'),hit=$('retHit'),xh=$('retXh'),dots=$('retDots'),tip=$('tip');
+  const valAt=(s,t)=>{let v=s.pts[0].p;for(const p of s.pts){if(p.t<=t)v=p.p;else break}return(t>s.pts[s.pts.length-1].t+432e5)?null:v};
+  const at=e=>{
+    const rc=svg.getBoundingClientRect(),sx=(e.clientX-rc.left)*(W/rc.width);
+    let t=t0+(sx-m.l)/(W-m.l-m.r)*(t1-t0);
+    // 가장 가까운 거래일로 맞춤
+    let best=null;ser.forEach(s=>s.pts.forEach(p=>{if(!best||Math.abs(p.t-t)<Math.abs(best-t))best=p.t}));t=best;
+    const cx=X(t);xh.setAttribute('x1',cx);xh.setAttribute('x2',cx);xh.style.display='';
+    const rows=ser.map(s=>({s,v:valAt(s,t)})).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
+    dots.innerHTML=rows.map(r=>mk(SHAPES[r.s.slot],cx,Y(r.v),4.5,slot(r.s.slot))).join('');
+    tip.innerHTML=`<div class="th">${mkDay(new Date(t))}</div>`+rows.map(r=>`<div class="r"><span>${swatch(r.s.slot)}${esc(r.s.label)}</span><span>${mkPct(r.v)}</span></div>`).join('')+`<div class="ft">${RET.range==='YTD'?'전년 말':'기간 시작'} 대비</div>`;
+    tip.style.display='block';
+    const w=tip.offsetWidth,h=tip.offsetHeight;let x=e.clientX+14,y=e.clientY+14;
+    if(x+w>innerWidth-8)x=e.clientX-w-14;if(y+h>innerHeight-8)y=innerHeight-h-8;
+    tip.style.left=Math.max(8,x)+'px';tip.style.top=Math.max(8,y)+'px';
+  };
+  const off=()=>{xh.style.display='none';dots.innerHTML='';tip.style.display='none'};
+  hit.addEventListener('pointermove',at);hit.addEventListener('pointerdown',at);hit.addEventListener('pointerleave',off);hit.addEventListener('pointercancel',off);
+}
+function retTable(items){
+  const cols=[['daily','일간'],['weekly','주간'],['monthly','월간'],['quarterly','분기'],['half','반기'],['ytd','YTD'],['annual','연간']];
+  const key=RET.sort||{k:RET_KEY[RET.range],d:-1},hk=RET_KEY[RET.range];
+  if(!items.length){$('retTbl').innerHTML='';return}
+  const rows=items.slice().sort((a,b)=>{
+    const va=a.r?a.r[key.k]:null,vb=b.r?b.r[key.k]:null;
+    if(va==null&&vb==null)return 0;if(va==null)return 1;if(vb==null)return -1;return (vb-va)*(key.d===-1?1:-1);
+  });
+  const th=`<tr><th class="nmc">기업</th><th>현재가</th>${cols.map(([k,l])=>`<th class="s${k===key.k?' cur':''}" data-rs="${k}" tabindex="0" title="눌러서 정렬">${l}${k===key.k?`<span class="ar">${key.d===-1?'▼':'▲'}</span>`:''}</th>`).join('')}</tr>`;
+  $('retTbl').innerHTML=th+rows.map(it=>`<tr class="pr" tabindex="0" data-mkco="${esc(it.id)}"><td class="nmc"><span class="nm">${swatch(it.slot)}${esc(it.label)}<span class="x">${esc(it.tk||'–')}</span></span></td>`
+    +(it.r?`<td>${mkPx(it.r.price)}</td>`+cols.map(([k])=>`<td>${mkPct(it.r[k])}</td>`).join(''):`<td colspan="8" class="x" style="text-align:left">주가 없음 — “전체 주가 가져오기”로 먼저 가져오세요</td>`)+'</tr>').join('');
+}
+function renderRet(){
+  if(!$('secRet')||!CO_ORDER.length)return;
+  document.querySelectorAll('#segRetRng button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.r===RET.range));
+  const full=RET.sel.length>=RET_MAX;
+  $('retChips').innerHTML=CO_ORDER.map(id=>{
+    const s=RET.sel.find(x=>x.id===id),dis=!s&&full;
+    return `<button class="chip" data-rc="${esc(id)}" aria-pressed="${!!s}" aria-disabled="${dis}" ${dis?'title="최대 8개사까지 고를 수 있습니다"':''}>${s?swatch(s.slot):''}${esc(CO_LABEL[id])}</button>`}).join('');
+  const items=retItems();
+  retChart(items);retTable(items);
+  const miss=items.filter(it=>!it.s).map(it=>it.label);
+  $('retNote').textContent=`선 차트는 선택한 기간의 시작일을 0%로 맞춘 수익률이고, 표는 일간~연간 수익률을 같은 기준(마지막 종가 대비)으로 계산한 값입니다. 표의 제목을 누르면 그 기간으로 정렬되고, 행을 누르면 그 기업으로 이동합니다.`+(miss.length?` 주가가 없는 기업: ${miss.join(', ')}.`:'');
+}
+function retInit(){
+  const root=$('secRet');if(!root)return;
+  root.addEventListener('click',e=>{
+    const r=e.target.closest('#segRetRng button');if(r){RET.range=r.dataset.r;RET.sort=null;retSave();renderRet();return}
+    const c=e.target.closest('[data-rc]');if(c){if(c.getAttribute('aria-disabled')==='true')return;retToggle(c.dataset.rc);return}
+    const h=e.target.closest('[data-rs]');if(h){const k=h.dataset.rs,cur=RET.sort||{k:RET_KEY[RET.range],d:-1};RET.sort={k,d:cur.k===k?-cur.d:-1};renderRet();return}
+    const row=e.target.closest('[data-mkco]');
+    if(row){S.co=row.dataset.mkco;S.prod=null;S.bf='all';S.scope='all';resetRange();render();$('secMkt').scrollIntoView({behavior:'smooth',block:'start'})}
+  });
+  root.addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.closest&&e.target.closest('[data-rs],[data-mkco]');if(t)t.click()}});
 }
 
 boot();
