@@ -1,0 +1,113 @@
+{
+  "ALNY": {
+    "label": "앨나일람",
+    "sort_order": 1,
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB",
+      "ROYALTY"
+    ],
+    "region_note": "제품 매출 지역별 (4개 제품 합산: 미국·유럽·기타 지역)",
+    "us_ticker": "ALNY"
+  },
+  "ARGX": {
+    "label": "아르젠엑스",
+    "sort_order": 2,
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB"
+    ],
+    "region_note": "비브가르트 지역별 매출 (미국·유럽·일본·기타 국가)",
+    "us_ticker": "ARGX"
+  },
+  "ARWR": {
+    "label": "애로우헤드",
+    "sort_order": 3,
+    "bucket_order": [],
+    "region_note": "",
+    "us_ticker": "ARWR"
+  },
+  "BNTX": {
+    "label": "바이오엔텍",
+    "sort_order": 4,
+    "bucket_order": [
+      "PRODUCT",
+      "LICENSE",
+      "RND",
+      "OTHERC"
+    ],
+    "region_note": "",
+    "us_ticker": "BNTX"
+  },
+  "HALO": {
+    "label": "할로자임",
+    "sort_order": 5,
+    "bucket_order": [
+      "ROYALTY",
+      "PRODUCT",
+      "COLLAB"
+    ],
+    "region_note": "",
+    "us_ticker": "HALO"
+  },
+  "MDGL": {
+    "label": "마드리갈",
+    "sort_order": 6,
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB"
+    ],
+    "region_note": "",
+    "us_ticker": "MDGL"
+  },
+  "MRNA": {
+    "label": "모더나",
+    "sort_order": 7,
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB"
+    ],
+    "region_note": "제품 매출 지역별 (미국·유럽·기타 지역)",
+    "us_ticker": "MRNA"
+  },
+  "REGN": {
+    "label": "리제네론",
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB",
+      "OTHERR"
+    ],
+    "region_note": "",
+    "us_ticker": "REGN",
+    "sort_order": 8
+  },
+  "RVMD": {
+    "label": "레볼루션 메디슨",
+    "sort_order": 9,
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB"
+    ],
+    "region_note": "",
+    "us_ticker": "RVMD"
+  },
+  "SRPT": {
+    "label": "사렙타",
+    "sort_order": 10,
+    "bucket_order": [
+      "PRODUCT",
+      "COLLAB"
+    ],
+    "region_note": "",
+    "us_ticker": "SRPT"
+  },
+  "VRTX": {
+    "label": "버텍스",
+    "bucket_order": [
+      "PRODUCT"
+    ],
+    "region_note": "제품 매출 지역별 (미국·유럽·기타 지역)",
+    "us_ticker": "VRTX",
+    "sort_order": 11
+  }
+}
