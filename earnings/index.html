@@ -241,6 +241,7 @@ details.mk-all summary{cursor:pointer;color:var(--ink2);font-size:13px;padding:4
       <button data-f="a" aria-pressed="true">연간</button><button data-f="q" aria-pressed="false">분기</button></div></div>
     <div class="grp"><label for="selFrom">기간</label><select id="selFrom"></select><span class="lab">~</span><select id="selTo" aria-label="종료 기간"></select></div>
     <div class="grp"><label for="selRef">기준 기간</label><select id="selRef"></select></div>
+    <div class="grp" id="estGrp"><label class="chk"><input type="checkbox" id="chkEst" checked> 추정치(E) 포함</label></div>
   </div></div>
 
   <section class="kpis" id="kpis" aria-label="핵심 지표"></section>
@@ -337,7 +338,7 @@ details.mk-all summary{cursor:pointer;color:var(--ink2);font-size:13px;padding:4
   <section class="card sec" id="secCmp">
     <div class="sec-h">
       <div><h2>제품 비교</h2><p>기업에 상관없이 원하는 제품을 골라 매출과 성장률을 나란히 비교합니다 · 위의 기업·기간 선택과는 별개로 동작하며 각 제품의 원본 전 기간을 보여줍니다</p></div>
-      <div class="seg" id="segCmpF" role="group" aria-label="비교 주기"><button data-f="a" aria-pressed="true">연간</button><button data-f="q" aria-pressed="false">분기</button></div>
+      <div class="grp"><label class="chk"><input type="checkbox" id="chkCmpEst" checked> 추정치(E) 포함</label><div class="seg" id="segCmpF" role="group" aria-label="비교 주기"><button data-f="a" aria-pressed="true">연간</button><button data-f="q" aria-pressed="false">분기</button></div></div>
     </div>
     <div class="cmp-pick">
       <div class="cmp-search">
@@ -372,6 +373,13 @@ details.mk-all summary{cursor:pointer;color:var(--ink2);font-size:13px;padding:4
 <script>
 /* ---------- 데이터 로딩: Supabase(우선) -> data/data.json(대체) ---------- */
 let DATA={},CFG={},CO_ORDER=[],CO_LABEL={},REGNOTE={};
+let GL={a:'',q:''};
+function prepEst(){
+  for(const id in DATA){const c=DATA[id];[c.total,c.core_total,...c.buckets,...c.products,...c.regions].filter(Boolean).forEach(s=>{['a','q'].forEach(f=>{s[f+'T']=Object.assign({},s[f],s[f+'e']||{})})})}
+  GL={a:'',q:''};for(const id in DATA){const c=DATA[id];if(!Object.keys(c.total.ae||{}).length)continue;['a','q'].forEach(f=>{const m=Object.keys(c.total[f]).sort().pop();if(m>GL[f])GL[f]=m})}
+}
+let CMPE=new Set();
+const isEstG=(f,k)=>CMPE.has(k);
 const SB_LS='earn_sb_v1';
 function sbConf(){
   let c=window.EARN_CONFIG||{},u=c.supabaseUrl||'',k=c.supabaseAnonKey||'';
@@ -392,14 +400,14 @@ async function sbAll(sb,table,cols,order){
 async function loadSupabase(sb){
   const [co,bk,pr,rg,up]=await Promise.all([
     sbAll(sb,'earn_companies','*','sort_order'),
-    sbAll(sb,'earn_buckets','company_id,id,en,ko,kind,scope,parent,a,q,der,derived_pts,sort_order','company_id,sort_order'),
-    sbAll(sb,'earn_products','company_id,id,en,bucket,kind,flags,other,a,q,sort_order','company_id,sort_order'),
-    sbAll(sb,'earn_regions','company_id,id,en,ko,a,q,sort_order','company_id,sort_order'),
+    sbAll(sb,'earn_buckets','company_id,id,en,ko,kind,scope,parent,a,q,ae,qe,der,derived_pts,sort_order','company_id,sort_order'),
+    sbAll(sb,'earn_products','company_id,id,en,bucket,kind,flags,other,a,q,ae,qe,sort_order','company_id,sort_order'),
+    sbAll(sb,'earn_regions','company_id,id,en,ko,a,q,ae,qe,sort_order','company_id,sort_order'),
     fetch(`${sb.url}/rest/v1/earn_updates?select=at&order=at.desc&limit=1`,{headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}}).then(r=>r.ok?r.json():[]).catch(()=>[])
   ]);
   if(!co.length)throw new Error('earn_companies 가 비어 있습니다');
   const by={};
-  co.forEach(c=>{by[c.id]={id:c.id,name:c.name,ticker:c.ticker,ko:c.ko,buckets:[],products:[],regions:[],notes:c.notes||[],total:c.total||{a:{},q:{}}};
+  co.forEach(c=>{by[c.id]={id:c.id,name:c.name,ticker:c.ticker,ko:c.ko,buckets:[],products:[],regions:[],notes:c.notes||[],total:Object.assign({a:{},q:{},ae:{},qe:{}},c.total||{})};
     if(c.core_total)by[c.id].core_total=c.core_total;if(c.core_label)by[c.id].core_label=c.core_label;});
   bk.forEach(b=>{if(by[b.company_id]){const{company_id,sort_order,...x}=b;by[b.company_id].buckets.push(x)}});
   pr.forEach(p=>{if(by[p.company_id]){const{company_id,sort_order,...x}=p;by[p.company_id].products.push(x)}});
@@ -446,7 +454,7 @@ async function boot(){
     try{res=await loadLocal()}
     catch(e){document.body.insertAdjacentHTML('afterbegin','<p style="padding:24px;color:#d03b3b">데이터를 불러오지 못했습니다: '+(e.message||e)+'</p>');return}
   }
-  DATA=res.data;initMeta(res.meta);
+  DATA=res.data;prepEst();initMeta(res.meta);
   S.co=CO_ORDER[0];
   setSrc('데이터: '+note+' · <a href="#" id="sbSet">연결 설정</a>');
   const a=document.getElementById('sbSet');if(a)a.addEventListener('click',ev=>{ev.preventDefault();sbSettings()});
@@ -455,29 +463,33 @@ async function boot(){
   mkLoad();
 }
 
-const S={co:'ABBV',f:'a',from:null,to:null,ref:null,view:'share',scope:'all',prod:null,sort:{k:'rev',d:-1},bf:'all',more:false};
+const S={est:true,co:'ABBV',f:'a',from:null,to:null,ref:null,view:'share',scope:'all',prod:null,sort:{k:'rev',d:-1},bf:'all',more:false};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=n=>n==null?'–':Math.round(n).toLocaleString('en-US');
 const pct=(n,d=1)=>n==null?'–':(n*100).toFixed(d)+'%';
 const sgn=(n,d=1)=>n==null?'–':(n>=0?'+':'−')+Math.abs(n*100).toFixed(d)+'%';
 function C(){return DATA[S.co]}
+const FK=()=>S.est?S.f+'T':S.f;
+const fq=f=>CMP.est?f+'T':f;
+function hasEst(){return Object.keys(C().total.ae||{}).length>0}
+function isEst(k){const t=C().total;return t[S.f][k]==null&&(t[S.f+'e']||{})[k]!=null}
 function allKeys(f){
   const set=new Set();const c=C();
-  Object.keys(c.total[f]).forEach(k=>set.add(k));
+  Object.keys(c.total[f+(S.est?'T':'')]).forEach(k=>set.add(k));
   return [...set].sort();
 }
-function lab(k){return S.f==='a'?k:k.slice(0,4)+' '+k.slice(4)}
-function short(k){return S.f==='a'?k:k.slice(2,4)+'Q'+k.slice(5)}
+function lab(k){return (S.f==='a'?k:k.slice(0,4)+' '+k.slice(4))+(isEst(k)?'E':'')}
+function short(k){return (S.f==='a'?k:k.slice(2,4)+'Q'+k.slice(5))+(isEst(k)?'E':'')}
 function prevK(k){return S.f==='a'?String(+k-1):(parseInt(k.slice(0,4))-1)+k.slice(4)}
 function keysInRange(){return allKeys(S.f).filter(k=>k>=S.from&&k<=S.to)}
-function val(s,k){const v=s[S.f][k];return v==null?null:v}
+function val(s,k){const v=s[FK()][k];return v==null?null:v}
 function growth(s,k){
   const cur=val(s,k),pv=val(s,prevK(k));
   if(cur==null)return null;
   if(pv==null){
-    const fk=Object.keys(s[S.f]).sort()[0];
-    return (cur>0&&fk===k&&prevK(k)>=allKeys(S.f)[0])?{nw:true}:null;
+    const fk0=Object.keys(s[FK()]).sort()[0];
+    return (cur>0&&fk0===k&&prevK(k)>=allKeys(S.f)[0])?{nw:true}:null;
   }
   if(pv<=0)return cur>0?{nw:true}:null;
   return {g:cur/pv-1,low:pv<(S.f==='a'?100:30),pv};
@@ -489,9 +501,9 @@ function slot(i){return 'var(--s'+(i+1)+')'}
 function topBuckets(){
   const c=C();
   return c.buckets.filter(b=>!b.parent&&(S.scope==='all'||b.scope==='pharma')).filter(b=>{
-    if(!Object.keys(b[S.f]).length)return false;
+    if(!Object.keys(b[FK()]).length)return false;
     if(b.kind!=='unclassified')return true;
-    return Object.values(b[S.f]).some(v=>Math.abs(v)>1.5);
+    return Object.values(b[FK()]).some(v=>Math.abs(v)>1.5);
   });
 }
 function groups(){
@@ -504,7 +516,7 @@ function groups(){
 }
 function gval(g,k){
   const c=C();let s=0,any=false;
-  g.ids.forEach(id=>{const b=c.buckets.find(x=>x.id===id);const v=b[S.f][k];if(v!=null){s+=v;any=true}});
+  g.ids.forEach(id=>{const b=c.buckets.find(x=>x.id===id);const v=b[FK()][k];if(v!=null){s+=v;any=true}});
   return any?s:null;
 }
 function baseAt(gs,k){let s=0;gs.forEach(g=>{const v=gval(g,k);if(v!=null&&v>0)s+=v});return s}
@@ -528,7 +540,7 @@ function stacked(el,gs,keys,opt){
     const raw=gs.map(g=>(opt.get||gval)(g,k));
     const partial=opt.requireAll&&raw.some(v=>v==null)&&raw.some(v=>v!=null);
     const vals=raw.map(v=>(v==null||partial)?0:Math.max(0,v));
-    return {k,vals,base:vals.reduce((a,b)=>a+b,0),partial};
+    return {k,vals,base:vals.reduce((a,b)=>a+b,0),partial,est:isEst(k)};
   });
   let max=opt.share?1:niceMax(Math.max(...cols.map(c=>c.base),1));
   const band=iw/n,bw=Math.min(30,band*.62);
@@ -553,7 +565,7 @@ function stacked(el,gs,keys,opt){
       const h=Math.max(0,y0-y1-(j===0?0:0)-2>0?y0-y1-2:y0-y1);
       const yy=y0-h;
       const top=j===lastIdx;
-      out+=`<path d="${rp(x,yy,bw,h,top?4:0)}" fill="${gs[j].color}" data-g="${gs[j].id}"/>`;
+      out+=`<path d="${rp(x,yy,bw,h,top?4:0)}" fill="${gs[j].color}" ${c.est?'fill-opacity=".5"':''} data-g="${gs[j].id}"/>`;
       acc+=v;
     });
     out+=`<rect x="${m.l+band*i}" y="${m.t}" width="${band}" height="${ih+m.b}" fill="transparent" data-k="${c.k}" style="cursor:pointer"/>`;
@@ -561,19 +573,25 @@ function stacked(el,gs,keys,opt){
       out+=`<text x="${cx}" y="${H-6}" text-anchor="middle" ${c.k===S.ref?'style="fill:var(--ink);font-weight:600"':''}>${short(c.k)}</text>`;
     }
   });
+  const fi=cols.findIndex(c=>c.est);
+  if(fi>0){const bx=m.l+band*fi;out+=`<line x1="${bx}" x2="${bx}" y1="${m.t}" y2="${m.t+ih}" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".7"/><text x="${bx+4}" y="${m.t+10}" style="font-size:10.5px;paint-order:stroke;stroke:var(--card);stroke-width:3px">추정치(E) →</text>`}
   out+='</svg>';
   el.innerHTML=out;
 }
-function spark(vals,color,w=96,h=26){
+function spark(vals,color,w=96,h=26,ei=-1){
   const pts=vals.map((v,i)=>({v,i})).filter(p=>p.v!=null);
   if(pts.length<2)return '<span class="lab">–</span>';
   const n=vals.length,mn=Math.min(...pts.map(p=>p.v),0),mx=Math.max(...pts.map(p=>p.v));
   const rng=(mx-mn)||1,px=i=>2+(w-6)*i/Math.max(1,n-1),py=v=>h-3-(h-8)*(v-mn)/rng;
-  const d=pts.map((p,j)=>(j?'L':'M')+px(p.i).toFixed(1)+','+py(p.v).toFixed(1)).join('');
+  const aP=pts.filter(p=>ei<0||p.i<ei),eP=ei<0?[]:pts.filter(p=>p.i>=ei);
+  const seg=a=>a.map((p,j)=>(j?'L':'M')+px(p.i).toFixed(1)+','+py(p.v).toFixed(1)).join('');
+  const d=seg(ei<0?pts:aP);
+  const dE=eP.length?seg((aP.length?[aP[aP.length-1]]:[]).concat(eP)):'';
   const last=pts[pts.length-1];
   const area=d+`L${px(last.i).toFixed(1)},${h-3}L${px(pts[0].i).toFixed(1)},${h-3}Z`;
-  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:inline-block;width:${w}px;height:${h}px;vertical-align:middle" aria-hidden="true"><path d="${area}" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${px(last.i).toFixed(1)}" cy="${py(last.v).toFixed(1)}" r="3.5" fill="${color}" stroke="var(--card)" stroke-width="2"/></svg>`;
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:inline-block;width:${w}px;height:${h}px;vertical-align:middle" aria-hidden="true"><path d="${area}" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dE?`<path d="${dE}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="3 3" stroke-linejoin="round" stroke-linecap="round" opacity=".75"/>`:''}<circle cx="${px(last.i).toFixed(1)}" cy="${py(last.v).toFixed(1)}" r="3.5" fill="${eP.length&&last.i>=ei?'var(--card)':color}" stroke="${color}" stroke-width="${eP.length&&last.i>=ei?1.5:2}"/></svg>`;
 }
+function sp(s,color){const ks=keysInRange();return spark(ks.map(k=>val(s,k)),color,96,26,ks.findIndex(isEst))}
 function gcell(o,withBar){
   if(!o)return '<span class="lab">–</span>';
   if(o.nw)return '<span class="tag" style="margin:0">신규</span>';
@@ -596,6 +614,7 @@ function setup(){
   $('selTo').onchange=e=>{S.to=e.target.value;if(S.to<S.from)S.from=S.to;fixRef();render()};
   $('selRef').onchange=e=>{S.ref=e.target.value;render()};
   $('chkMore').onchange=e=>{S.more=e.target.checked;render()};
+  $('chkEst').onchange=e=>{S.est=e.target.checked;S.prod=null;resetRange();render()};
   document.addEventListener('click',e=>{
     const k=e.target.closest('[data-k]');
     if(k){S.ref=k.dataset.k;render();return}
@@ -607,17 +626,21 @@ function setup(){
   cmpInit();resetRange();render();
 }
 function resetRange(){
-  const ks=allKeys(S.f);S.from=ks[0];S.to=ks[ks.length-1];S.ref=S.to;
+  const ks=allKeys(S.f);S.from=ks[0];S.to=ks[ks.length-1];S.ref=Object.keys(C().total[S.f]).sort().pop();   // 기준 기간 기본값 = 마지막 실적
 }
 function fixRef(){if(S.ref<S.from)S.ref=S.from;if(S.ref>S.to)S.ref=S.to}
 function covText(){
   const c=C(),a=Object.keys(c.total.a).sort(),q=Object.keys(c.total.q).sort();
+  const ae=Object.keys(c.total.ae||{}).sort(),qe=Object.keys(c.total.qe||{}).sort();
   const ql=k=>k.slice(0,4)+' '+k.slice(4);
-  return `${CO_LABEL[S.co]} 데이터 범위: 연간 ${a[0]}–${a[a.length-1]}${q.length?`, 분기 ${ql(q[0])}–${ql(q[q.length-1])}`:''} (원본 PDF의 전 기간)`;
+  let t=`${CO_LABEL[S.co]} 실적 범위: 연간 ${a[0]}–${a[a.length-1]}${q.length?`, 분기 ${ql(q[0])}–${ql(q[q.length-1])}`:''} (원본 PDF의 전 기간)`;
+  if(ae.length||qe.length)t+=` · 컨센서스 추정치(E): 연간 ${ae.length?ae[0]+'–'+ae[ae.length-1]:'–'}, 분기 ${qe.length?ql(qe[0])+'–'+ql(qe[qe.length-1]):'–'}`;
+  return t;
 }
 function render(){
   const c=C();
   $('subtitle').textContent='Bloomberg 기업 재무정보 기준 · 단위 백만 USD · '+covText();
+  const he=hasEst();$('estGrp').hidden=!he;$('chkEst').checked=S.est;
   document.querySelectorAll('#segCo button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===S.co));
   document.querySelectorAll('#segFreq button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===S.f));
   document.querySelectorAll('#segView button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===S.view));
@@ -673,16 +696,16 @@ function renderDis(){
     if(b.kind==='unclassified'&&(v==null||Math.abs(v)<1))return;
     const derived=(b.der[S.f]||[]).includes(k);
     const isOther=b.kind==='other'||b.kind==='unclassified';
-    rows.push(`<tr class="${isOther?'mut':''}"><td><span class="nm"><i class="sw" style="background:${colorOf(b.id)}"></i><span title="${esc(b.en)}">${esc(b.ko)}${derived?'<span class="tag" title="이 기간은 원본에 질환 소계가 없어 소속 제품 매출을 합산했습니다">합산</span>':''}</span></span></td><td>${fmt(v)}</td><td>${v!=null&&base&&v>0?pct(v/base):'–'}</td><td>${isOther?'<span class="lab">–</span>':gcell(gr,false)}</td><td>${spark(keysInRange().map(kk=>val(b,kk)),colorOf(b.id))}</td></tr>`);
+    rows.push(`<tr class="${isOther?'mut':''}"><td><span class="nm"><i class="sw" style="background:${colorOf(b.id)}"></i><span title="${esc(b.en)}">${esc(b.ko)}${derived?'<span class="tag" title="이 기간은 원본에 질환 소계가 없어 소속 제품 매출을 합산했습니다">합산</span>':''}</span></span></td><td>${fmt(v)}</td><td>${v!=null&&base&&v>0?pct(v/base):'–'}</td><td>${isOther?'<span class="lab">–</span>':gcell(gr,false)}</td><td>${sp(b,colorOf(b.id))}</td></tr>`);
     if(S.scope==='all'){
       c.buckets.filter(x=>x.parent===b.id).forEach(ch=>{
         const cv=val(ch,k);
-        rows.push(`<tr class="sub"><td title="${esc(ch.en)}">${esc(ch.ko)}</td><td>${fmt(cv)}</td><td>${cv!=null&&base&&cv>0?pct(cv/base):'–'}</td><td>${ch.kind==='unclassified'?'<span class="lab">–</span>':gcell(growth(ch,k),false)}</td><td>${spark(keysInRange().map(kk=>val(ch,kk)),colorOf(b.id))}</td></tr>`);
+        rows.push(`<tr class="sub"><td title="${esc(ch.en)}">${esc(ch.ko)}</td><td>${fmt(cv)}</td><td>${cv!=null&&base&&cv>0?pct(cv/base):'–'}</td><td>${ch.kind==='unclassified'?'<span class="lab">–</span>':gcell(growth(ch,k),false)}</td><td>${sp(ch,colorOf(b.id))}</td></tr>`);
       });
     }
   });
   const tot=val(c.total,k);
-  rows.push(`<tr style="font-weight:600"><td>총매출 (보고 기준)</td><td>${fmt(tot)}</td><td>${base&&tot?pct(tot/base,0):'–'}</td><td>${gcell(growth(c.total,k),false)}</td><td>${spark(keysInRange().map(kk=>val(c.total,kk)),'var(--ink2)')}</td></tr>`);
+  rows.push(`<tr style="font-weight:600"><td>총매출 (${isEst(k)?'컨센서스 추정':'보고 기준'})</td><td>${fmt(tot)}</td><td>${base&&tot?pct(tot/base,0):'–'}</td><td>${gcell(growth(c.total,k),false)}</td><td>${sp(c.total,'var(--ink2)')}</td></tr>`);
   $('disTbl').innerHTML=`<thead><tr><th>${lab(k)} 기준</th><th>매출</th><th>비중</th><th>${S.f==='a'?'전년':'전년 동기'} 대비</th><th>추이</th></tr></thead><tbody>${rows.join('')}</tbody>`;
 }
 
@@ -733,7 +756,7 @@ function renderProd(){
   const body=rows.map(r=>{
     const p=r.p,b=bucketOf(p.bucket);
     const tags=(p.flags.includes('sum')?'<span class="tag" title="Keytruda IV와 Qlex를 합한 값">합산</span>':'')+(p.flags.includes('alliance')?'<span class="tag" title="제휴·협업 수익으로 별도 보고된 값">협업수익</span>':'')+(p.flags.includes('prior')?'<span class="tag" title="이전 공시 기준 항목">이전공시</span>':'')+(p.flags.includes('part')?'<span class="tag">세부</span>':'')+(/^Alliance/.test(p.en)?'<span class="tag" title="제휴 수익으로 보고된 값">제휴</span>':'');
-    return `<tr class="pr ${p.id===S.prod?'sel':''}" tabindex="0" data-p="${esc(p.id)}"><td><span class="nm"><i class="sw" style="background:${bcolor(p.bucket)}"></i><span>${esc(p.en)}${tags}</span></span></td><td style="text-align:left;color:var(--ink2)">${esc(b.ko)}</td><td>${fmt(r.rev)}</td><td>${tot?pct(r.rev/tot):'–'}</td><td>${gcell(r.gr,true)}</td><td>${spark(keys.map(kk=>val(p,kk)),bcolor(p.bucket))}</td></tr>`;
+    return `<tr class="pr ${p.id===S.prod?'sel':''}" tabindex="0" data-p="${esc(p.id)}"><td><span class="nm"><i class="sw" style="background:${bcolor(p.bucket)}"></i><span>${esc(p.en)}${tags}</span></span></td><td style="text-align:left;color:var(--ink2)">${esc(b.ko)}</td><td>${fmt(r.rev)}</td><td>${tot?pct(r.rev/tot):'–'}</td><td>${gcell(r.gr,true)}</td><td>${sp(p,bcolor(p.bucket))}</td></tr>`;
   }).join('');
   $('prodTbl').innerHTML=`<thead><tr>${th('name','제품')}<th style="text-align:left">질환</th>${th('rev','매출')}${th('share','총매출 비중')}${th('gr',(S.f==='a'?'전년':'전년 동기')+' 대비')}<th>추이</th></tr></thead><tbody>${body||'<tr><td colspan="6" class="empty">이 기간에 매출이 있는 제품이 없습니다.</td></tr>'}</tbody>`;
   const onSort=e=>{const h=e.target.closest('th[data-sort]');if(!h)return;const x=h.dataset.sort;if(S.sort.k===x)S.sort.d*=-1;else{S.sort={k:x,d:x==='name'?1:-1}}renderProd()};
@@ -779,13 +802,16 @@ function colChart(el,p,keys,color,isG){
   keys.forEach((k,i)=>{
     const v=vs[i],cx=m.l+band*i+band/2,x=cx-bw/2;
     if(v!=null){
-      if(!isG)o+=`<path d="${rp(x,y(v),bw,y(0)-y(v),4)}" fill="${color}" ${k===S.ref?'':'opacity=".78"'}/>`;
-      else{const up=v>=0;const h=Math.abs(y(v)-y(0));o+=`<path d="${up?rp(x,y(v),bw,h,4):`M${x},${y(0)}V${y(0)+h-4}Q${x},${y(0)+h} ${x+4},${y(0)+h}H${x+bw-4}Q${x+bw},${y(0)+h} ${x+bw},${y(0)+h-4}V${y(0)}Z`}" fill="${up?'var(--pos)':'var(--neg)'}" ${k===S.ref?'':'opacity=".78"'}/>`}
+      const eo=isEst(k)?'opacity=".42"':(k===S.ref?'':'opacity=".78"');
+      if(!isG)o+=`<path d="${rp(x,y(v),bw,y(0)-y(v),4)}" fill="${color}" ${eo}/>`;
+      else{const up=v>=0;const h=Math.abs(y(v)-y(0));o+=`<path d="${up?rp(x,y(v),bw,h,4):`M${x},${y(0)}V${y(0)+h-4}Q${x},${y(0)+h} ${x+4},${y(0)+h}H${x+bw-4}Q${x+bw},${y(0)+h} ${x+bw},${y(0)+h-4}V${y(0)}Z`}" fill="${up?'var(--pos)':'var(--neg)'}" ${eo}/>`}
     }
     o+=`<rect x="${m.l+band*i}" y="${m.t}" width="${band}" height="${ih+m.b}" fill="transparent" data-dk="${k}" data-dp="${esc(p.id)}"/>`;
     if(showLbl(i,n,every,keys.indexOf(S.ref)))o+=`<text x="${cx}" y="${H-6}" text-anchor="middle" ${k===S.ref?'style="fill:var(--ink);font-weight:600"':''}>${short(k)}</text>`;
   });
   o+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ink3)" stroke-width="1" opacity=".5"/>`;
+  const fi=keys.findIndex(isEst);
+  if(fi>0){const bx=m.l+band*fi;o+=`<line x1="${bx}" x2="${bx}" y1="${m.t}" y2="${m.t+ih}" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".7"/><text x="${bx+4}" y="${m.t+10}" style="font-size:10.5px;paint-order:stroke;stroke:var(--card);stroke-width:3px">E →</text>`}
   o+='</svg>';el.innerHTML=o;
 }
 function renderReg(){
@@ -796,7 +822,7 @@ function renderReg(){
   const keys=keysInRange();
   $('regSub').textContent=(REGNOTE[S.co]||'미국 / 미국 외')+' · '+(S.view==='share'?'비중 %':'매출액')+' · 막대를 누르면 기준 기간이 바뀝니다';
   $('regLegend').innerHTML=gs.map(g=>`<span><i class="sw" style="background:${g.color}"></i>${esc(g.name)}</span>`).join('');
-  stacked($('regChart'),gs,keys,{requireAll:true,share:S.view==='share',aria:'지역별 매출 추이',h:240,get:(g,k)=>{const v=g._s[S.f][k];return v==null?null:v}});
+  stacked($('regChart'),gs,keys,{requireAll:true,share:S.view==='share',aria:'지역별 매출 추이',h:240,get:(g,k)=>{const v=g._s[FK()][k];return v==null?null:v}});
 }
 
 function renderNotes(){
@@ -804,6 +830,8 @@ function renderNotes(){
   const derived=c.buckets.filter(b=>!b.parent&&b.derived_pts>0).map(b=>b.ko);
   const items=[
     '출처: Bloomberg 「기업 재무정보」 출력물(연간·분기). 값은 원본 그대로이며 단위는 백만 USD입니다.',
+    hasEst()?'숫자 뒤의 "E", 옅은 막대, 점선은 Bloomberg가 집계한 컨센서스 추정치(애널리스트 평균 전망)로 실제 실적이 아닙니다. 추정치는 Bloomberg 출력 시점 기준이며 이후 바뀔 수 있고, 투자 권유가 아닙니다. 상단의 "추정치 포함"을 끄면 실적만 볼 수 있습니다.':null,
+    hasEst()?'질환·제품별 추정치는 종목별로 따로 집계되어 합이 총매출 추정치와 정확히 맞지 않을 수 있습니다. 그 차이는 "기타·미분류"에 (음수 포함) 반영해 질환별 합이 항상 총매출 추정치가 되도록 했습니다. 모든 질환에 추정치가 있는 기간만 이렇게 계산합니다.':null,
     `${S.f==='a'?'전년':'전년 동기'} 대비 성장률 = 해당 기간 매출 ÷ ${S.f==='a'?'직전 연도':'전년 같은 분기'} 매출 − 1. 비교 기간 매출이 없으면 계산하지 않고, 전년 매출이 없거나 0이면 "신규", 연간 100백만·분기 30백만 USD 미만이면 "소액"으로 표시합니다.`,
     '"기타·미분류"는 회사가 질환별로 나눠 공시하지 않은 부분(기타 항목 + 총매출에서 분류 합계를 뺀 차이)입니다. 과거 연도일수록 원본에 분류 자료가 적어 이 비중이 커질 수 있습니다.',
     derived.length?`원본에 질환 소계가 없는 시점은 소속 제품 매출을 합산했습니다 (${derived.join(', ')}). 표에는 "합산" 표시가 붙습니다.`:null,
@@ -823,19 +851,19 @@ function tipMove(e){
   if(el.dataset.k){
     const k=el.dataset.k;const inReg=!!el.closest('#regChart');
     let gs;
-    if(inReg){gs=C().regions.map((r,i)=>({id:r.id,name:r.ko,color:'var(--r'+(i+1)+')',v:r[S.f][k]}))}
+    if(inReg){gs=C().regions.map((r,i)=>({id:r.id,name:r.ko,color:'var(--r'+(i+1)+')',v:r[FK()][k]}))}
     else gs=groups().map(g=>({id:g.id,name:g.name,color:g.color,v:gval(g,k)}));
     const base=gs.reduce((a,g)=>a+(g.v>0?g.v:0),0);
     html=`<div class="th">${lab(k)}</div>`+gs.slice().reverse().filter(g=>g.v!=null).map(g=>`<div class="r"><span><i class="sw" style="background:${g.color}"></i>${esc(g.name)}</span><span>${fmt(g.v)} · ${base&&g.v>0?pct(g.v/base):'–'}</span></div>`).join('');
     const tot=val(C().total,k);
-    html+=`<div class="ft">총매출(보고) ${fmt(tot)} 백만 USD${inReg?'':' · 클릭하면 기준 기간 변경'}</div>`;
+    html+=`<div class="ft">총매출(${isEst(k)?'컨센서스 추정':'보고'}) ${fmt(tot)} 백만 USD${inReg?'':' · 클릭하면 기준 기간 변경'}</div>`;
   }else if(el.dataset.dk){
     const k=el.dataset.dk,p=C().products.find(x=>x.id===el.dataset.dp);const g=growth(p,k);
     html=`<div class="th">${lab(k)}</div><div class="r"><span>${esc(p.en)}</span><span>${fmt(val(p,k))}</span></div><div class="r"><span>${S.f==='a'?'전년':'전년 동기'} 대비</span><span>${g?(g.nw?'신규':sgn(g.g)):'–'}</span></div>`;
   }else if(el.dataset.ck){
     const k=el.dataset.ck,f=CMP.f,gw=f==='a'?'전년':'전년 동기';
     const only=el.dataset.cp;
-    const rows=cmpSel().filter(s=>!only||s.key===only).map(s=>({s,v:s.it.p[f][k],g:cgrow(s.it,f,k)})).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
+    const rows=cmpSel().filter(s=>!only||s.key===only).map(s=>({s,v:s.it.p[fq(f)][k],g:cgrow(s.it,f,k)})).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
     html=`<div class="th">${labF(f,k)}</div>`+(rows.length?rows.map(r=>`<div class="r"><span>${swatch(r.s.slot)}${esc(r.s.it.name)}</span><span>${fmt(r.v)} · ${r.g?(r.g.nw?'신규':sgn(r.g.g)+(r.g.low?' (소액)':'')):'–'}</span></div>`).join(''):'<div class="r"><span>이 기간 데이터 없음</span></div>')+`<div class="ft">매출(백만 USD) · ${gw} 대비</div>`;
   }else return;
   tip.innerHTML=html;tip.style.display='block';
@@ -859,7 +887,7 @@ const CMP_EX=[
   {t:'키트루다 vs 다잘렉스',l:[['MSD','Keytruda (IV+Qlex 합산)'],['JNJ','Darzalex']]},
   {t:'휴미라·스카이리치·린버크',l:[['ABBV','Humira'],['ABBV','Skyrizi'],['ABBV','Rinvoq']]}
 ];
-const CMP={f:'a',sel:[],q:'',act:0,v:'combo',sc:'shared'};
+const CMP={est:true,f:'a',sel:[],q:'',act:0,v:'combo',sc:'shared'};
 let CMP_ALL=null;
 function cmpAll(){
   if(CMP_ALL)return CMP_ALL;
@@ -880,7 +908,7 @@ function cmpAll(){
   CMP_ALL=out;return out;
 }
 function cmpSel(){const all=cmpAll();return CMP.sel.map(s=>({...s,it:all.find(x=>x.key===s.key)})).filter(s=>s.it)}
-function cmpSave(){try{localStorage.setItem('pharma_cmp_v1',JSON.stringify({f:CMP.f,sel:CMP.sel,v:CMP.v,sc:CMP.sc}))}catch(e){}}
+function cmpSave(){try{localStorage.setItem('pharma_cmp_v1',JSON.stringify({f:CMP.f,sel:CMP.sel,v:CMP.v,sc:CMP.sc,est:CMP.est}))}catch(e){}}
 function cmpToggle(key){
   const i=CMP.sel.findIndex(s=>s.key===key);
   if(i>=0)CMP.sel.splice(i,1);
@@ -906,12 +934,14 @@ function cmpInit(){
       if(j.f==='a'||j.f==='q')CMP.f=j.f;
       if(j.v==='combo'||j.v==='two')CMP.v=j.v;
       if(j.sc==='shared'||j.sc==='each')CMP.sc=j.sc;
+      if(typeof j.est==='boolean')CMP.est=j.est;
       loaded=true;
     }
   }catch(e){}
   if(!loaded)cmpExample(CMP_EX[0]);
   $('cmpEx').innerHTML='<span class="lab">예시</span>'+CMP_EX.map((e,i)=>`<button class="chip" data-ex="${i}">${esc(e.t)}</button>`).join('')+'<button class="chip" data-ex="clear">모두 지우기</button>';
   $('cmpEx').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.ex==='clear'){CMP.sel=[];cmpSave();renderCmp();renderList()}else cmpExample(CMP_EX[+b.dataset.ex])};
+  $('chkCmpEst').onchange=e=>{CMP.est=e.target.checked;cmpSave();renderCmp()};
   $('segCmpF').onclick=e=>{const b=e.target.closest('button');if(!b)return;CMP.f=b.dataset.f;cmpSave();renderCmp()};
   $('segCmpV').onclick=e=>{const b=e.target.closest('button');if(!b)return;CMP.v=b.dataset.v;cmpSave();renderCmp()};
   $('segCmpS').onclick=e=>{const b=e.target.closest('button');if(!b)return;CMP.sc=b.dataset.s;cmpSave();renderCmp()};
@@ -957,14 +987,14 @@ function keySeq(f,a,b){
   else{let y=+a.slice(0,4),q=+a.slice(5);for(let g=0;g<200;g++){const k=y+'Q'+q;out.push(k);if(k===b)break;q++;if(q>4){q=1;y++}}}
   return out;
 }
-const labF=(f,k)=>f==='a'?k:k.slice(0,4)+' '+k.slice(4);
-const shortF=(f,k)=>f==='a'?k:k.slice(2,4)+'Q'+k.slice(5);
+const labF=(f,k)=>(f==='a'?k:k.slice(0,4)+' '+k.slice(4))+(isEstG(f,k)?'E':'');
+const shortF=(f,k)=>(f==='a'?k:k.slice(2,4)+'Q'+k.slice(5))+(isEstG(f,k)?'E':'');
 function cgrow(it,f,k){
-  const ser=it.p[f],cur=ser[k];if(cur==null)return null;
+  const ser=it.p[fq(f)],cur=ser[k];if(cur==null)return null;
   const pk=f==='a'?String(+k-1):(parseInt(k.slice(0,4))-1)+k.slice(4);
   const pv=ser[pk];
   if(pv==null){
-    const fk=Object.keys(ser).sort()[0],cov=Object.keys(DATA[it.co].total[f]).sort()[0];
+    const fk=Object.keys(ser).sort()[0],cov=Object.keys(DATA[it.co].total[fq(f)]).sort()[0];
     return (cur>0&&fk===k&&pk>=cov)?{nw:true}:null;
   }
   if(pv<=0)return cur>0?{nw:true}:null;
@@ -986,6 +1016,18 @@ function mk(shape,cx,cy,r,fill){
   }
 }
 function swatch(slotI){return `<svg viewBox="-7 -7 14 14" width="14" height="14" style="display:inline-block;width:14px;height:14px;overflow:visible;vertical-align:-2px" aria-hidden="true">${mk(SHAPES[slotI],0,0,4.5,slot(slotI))}</svg>`}
+function segPaths(vals,est,X,Y){
+  let d='',dE='',open=false,openE=false;
+  vals.forEach((v,i)=>{
+    if(v==null){open=false;openE=false;return}
+    if(est&&est[i]){
+      if(!openE){ if(i>0&&vals[i-1]!=null&&!(est[i-1])){dE+='M'+X(i-1).toFixed(1)+','+Y(vals[i-1]).toFixed(1)+'L'}else dE+='M'; }
+      else dE+='L';
+      dE+=X(i).toFixed(1)+','+Y(v).toFixed(1);openE=true;open=false;
+    }else{d+=(open?'L':'M')+X(i).toFixed(1)+','+Y(v).toFixed(1);open=true;openE=false}
+  });
+  return {d,dE};
+}
 function lineChart(el,series,keys,o){
   const n=keys.length;
   if(!n||!series.length){el.innerHTML='<div class="empty">비교할 제품을 선택하세요.</div>';return}
@@ -1006,9 +1048,9 @@ function lineChart(el,series,keys,o){
   const every=Math.max(1,Math.ceil(n/Math.max(4,Math.floor(iw/(o.f==='a'?46:42)))));
   keys.forEach((k,i)=>{if(showLbl(i,n,every,-1))out+=`<text x="${X(i)}" y="${H-6}" text-anchor="middle">${shortF(o.f,k)}</text>`});
   series.forEach(s=>{
-    let d='',open=false;
-    s.vals.forEach((v,i)=>{if(v==null){open=false;return}d+=(open?'L':'M')+X(i).toFixed(1)+','+y(v).toFixed(1);open=true});
+    const {d,dE}=segPaths(s.vals,s.est,X,y);
     out+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(dE)out+=`<path d="${dE}" fill="none" stroke="${s.color}" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" opacity=".8"/>`;
     s.vals.forEach((v,i)=>{if(v!=null&&(i===0||s.vals[i-1]==null)&&(i===n-1||s.vals[i+1]==null))out+=mk(s.shape,X(i),y(v),4,s.color)});   // isolated points
   });
   const ends=[];
@@ -1052,12 +1094,12 @@ function comboChart(el,list,keys,o){
   keys.forEach((kk,i)=>{if(showLbl(i,n,every,-1))out+=`<text x="${m.l+band*i+band/2}" y="${H-6}" text-anchor="middle">${shortF(o.f,kk)}</text>`});
   // bars (revenue, left axis)
   list.forEach((s,j)=>s.rev.forEach((v,i)=>{if(v==null||v<=0)return;
-    const h=v/sc.R*unit;out+=`<path d="${rp(cx(i,j)-bw/2,y0-h,bw,h,Math.min(3,bw/2))}" fill="${s.color}" fill-opacity=".5"/>`}));
+    const h=v/sc.R*unit;out+=`<path d="${rp(cx(i,j)-bw/2,y0-h,bw,h,Math.min(3,bw/2))}" fill="${s.color}" fill-opacity="${s.est&&s.est[i]?'.2':'.5'}" ${s.est&&s.est[i]?`stroke="${s.color}" stroke-dasharray="3 2" stroke-opacity=".8"`:''}/>`}));
   // lines (growth, right axis) - drawn over the bars with a surface halo so they stay readable on the same hue
   list.forEach((s,j)=>{
-    let d='',open=false;
-    s.gr.forEach((v,i)=>{if(v==null){open=false;return}d+=(open?'L':'M')+cx(i,j).toFixed(1)+','+yg(v).toFixed(1);open=true});
+    const {d,dE}=segPaths(s.gr,s.est,i=>cx(i,j),yg);
     if(d)out+=`<path d="${d}" fill="none" stroke="var(--card)" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(dE)out+=`<path d="${dE}" fill="none" stroke="var(--card)" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><path d="${dE}" fill="none" stroke="${s.color}" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round"/>`;
     s.gr.forEach((v,i)=>{if(v!=null&&(i===0||s.gr[i-1]==null)&&(i===n-1||s.gr[i+1]==null))out+=mk(s.shape,cx(i,j),yg(v),4,s.color)});
     let li=-1;s.gr.forEach((v,i)=>{if(v!=null)li=i});if(li>=0)out+=mk(s.shape,cx(li,j),yg(s.gr[li]),4.5,s.color);
   });
@@ -1071,19 +1113,22 @@ function renderCmp(){
   document.querySelectorAll('#segCmpF button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f));
   $('cmpChips').innerHTML=sel.length?sel.map(s=>`<span class="chip" style="cursor:default">${swatch(s.slot)}${esc(s.it.name)}<span class="co">${esc(CO_LABEL[s.it.co])}</span><button class="rm" data-rm="${esc(s.key)}" aria-label="${esc(s.it.name)} 제거">×</button></span>`).join(''):'<span class="lab">아직 고른 제품이 없습니다. 위 검색창에서 제품을 추가하거나 예시를 눌러보세요.</span>';
   let lo=null,hi=null;
-  sel.forEach(s=>{const ks=Object.keys(s.it.p[f]).filter(k=>s.it.p[f][k]!=null).sort();if(!ks.length)return;if(lo==null||ks[0]<lo)lo=ks[0];if(hi==null||ks[ks.length-1]>hi)hi=ks[ks.length-1]});
+  sel.forEach(s=>{const ks=Object.keys(s.it.p[fq(f)]).filter(k=>s.it.p[fq(f)][k]!=null).sort();if(!ks.length)return;if(lo==null||ks[0]<lo)lo=ks[0];if(hi==null||ks[ks.length-1]>hi)hi=ks[ks.length-1]});
   const keys=lo?keySeq(f,lo,hi):[];
+  CMPE=new Set(keys.filter(k=>CMP.est&&sel.some(s=>s.it.p[f][k]==null&&(s.it.p[f+'e']||{})[k]!=null)));
   const gw=f==='a'?'전년':'전년 동기';
   $('cmpGrTitle').innerHTML=`${gw} 대비 성장률 <span style="color:var(--ink3)">(−100%~+300% 범위로 표시 · 범위를 벗어난 값은 경계에 표시하고 마우스를 올리면 실제 값이 나옵니다)</span>`;
-  const rs=sel.map(s=>({color:slot(s.slot),shape:SHAPES[s.slot],label:s.it.name,vals:keys.map(k=>s.it.p[f][k]==null?null:s.it.p[f][k])}));
-  const gs=sel.map(s=>({color:slot(s.slot),shape:SHAPES[s.slot],label:s.it.name,vals:keys.map(k=>{const g=cgrow(s.it,f,k);return g&&g.g!=null?Math.max(-1,Math.min(3,g.g)):null})}));
+  const estOf=s=>keys.map(k=>s.it.p[f][k]==null&&(s.it.p[f+'e']||{})[k]!=null&&CMP.est);
+  $('chkCmpEst').checked=CMP.est;
+  const rs=sel.map(s=>({color:slot(s.slot),shape:SHAPES[s.slot],label:s.it.name,est:estOf(s),vals:keys.map(k=>s.it.p[fq(f)][k]==null?null:s.it.p[fq(f)][k])}));
+  const gs=sel.map(s=>({color:slot(s.slot),shape:SHAPES[s.slot],label:s.it.name,est:estOf(s),vals:keys.map(k=>{const g=cgrow(s.it,f,k);return g&&g.g!=null?Math.max(-1,Math.min(3,g.g)):null})}));
   const names=sel.map(s=>s.it.name).join(', ');
   const combo=CMP.v==='combo';
   document.querySelectorAll('#segCmpV button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===CMP.v));
   document.querySelectorAll('#segCmpS button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===CMP.sc));
   $('cmpComboWrap').hidden=!combo;$('cmpTwo').hidden=combo;
   if(combo){
-    const cl=sel.map((s,i)=>({key:s.key,color:slot(s.slot),shape:SHAPES[s.slot],label:s.it.name,co:CO_LABEL[s.it.co],rev:rs[i].vals,gr:gs[i].vals}));
+    const cl=sel.map((s,i)=>({key:s.key,color:slot(s.slot),shape:SHAPES[s.slot],label:s.it.name,co:CO_LABEL[s.it.co],rev:rs[i].vals,gr:gs[i].vals,est:rs[i].est}));
     const el=$('cmpCombo'),W=chartWidth(el);
     const k=cl.length,bwOne=((W-106)/Math.max(1,keys.length)*.78-(k-1)*2)/Math.max(1,k);
     const grid=k>3||(k>1&&bwOne<4);          // 4+ products (or bars too thin on a narrow screen) -> one small chart per product
@@ -1104,7 +1149,7 @@ function renderCmp(){
         let pc=c,pk=keys;
         if(CMP.sc==='each'){        // own scale -> also trim the time axis to the product's own coverage
           let a=-1,b=-1;c.rev.forEach((v,i)=>{if(v!=null){if(a<0)a=i;b=i}});
-          if(a>=0){pk=keys.slice(a,b+1);pc={...c,rev:c.rev.slice(a,b+1),gr:c.gr.slice(a,b+1)}}
+          if(a>=0){pk=keys.slice(a,b+1);pc={...c,rev:c.rev.slice(a,b+1),gr:c.gr.slice(a,b+1),est:c.est.slice(a,b+1)}}
         }
         comboChart(pn.querySelector('.pn-c'),[pc],pk,{h:230,sc:CMP.sc==='each'?comboScale([pc]):shared,f,small:true,cp:c.key,aria:`${c.label} 매출(막대)과 ${gw} 대비 증감률(선)`});
       });
@@ -1118,11 +1163,11 @@ function renderCmp(){
   if(sel.length&&keys.length){
     const head1=`<tr><th rowspan="2">기간</th>${sel.map(s=>`<th class="grp2 sep" colspan="2">${swatch(s.slot)} ${esc(s.it.name)}</th>`).join('')}</tr>`;
     const head2=`<tr>${sel.map(()=>`<th class="sep">매출</th><th>${gw} 대비</th>`).join('')}</tr>`;
-    const body=keys.slice().reverse().map(k=>`<tr><td>${labF(f,k)}</td>${sel.map(s=>{const v=s.it.p[f][k],g=cgrow(s.it,f,k);return `<td class="sep">${fmt(v)}</td><td>${g?gcell(g,false):'<span class="lab">–</span>'}</td>`}).join('')}</tr>`).join('');
+    const body=keys.slice().reverse().map(k=>`<tr><td>${labF(f,k)}</td>${sel.map(s=>{const v=s.it.p[fq(f)][k],g=cgrow(s.it,f,k);return `<td class="sep">${fmt(v)}</td><td>${g?gcell(g,false):'<span class="lab">–</span>'}</td>`}).join('')}</tr>`).join('');
     $('cmpTbl').innerHTML=`<thead>${head1}${head2}</thead><tbody>${body}</tbody>`;
   }else $('cmpTbl').innerHTML='';
-  const cov=sel.map(s=>{const ks=Object.keys(s.it.p[f]).filter(k=>s.it.p[f][k]!=null).sort();return ks.length?`${s.it.name} ${labF(f,ks[0])}~${labF(f,ks[ks.length-1])}`:`${s.it.name} (${f==='a'?'연간':'분기'} 데이터 없음)`}).join(' · ');
-  $('cmpNote').innerHTML=(sel.length?`데이터 범위: ${esc(cov)}<br>`:'')+`성장률은 비교할 ${f==='a'?'전년':'전년 동기'} 값이 있어야 계산되어 각 제품의 첫 ${f==='a'?'해':'4개 분기'}에는 나타나지 않습니다. 전년 매출이 작으면(연간 100·분기 30백만 USD 미만) 성장률이 과장될 수 있어 툴팁에 "소액"으로 표시합니다. 원본에 없는 기간은 선을 이어 그리지 않고 끊어 보여줍니다. 증감률이 −100%~+300%를 벗어나면 경계에 붙여 그리고 실제 값은 마우스를 올리면 나옵니다. 막대+선 복합 차트는 두 축의 0을 같은 높이에 맞추며, 4개 이상 고르면 제품별 차트로 나뉩니다.<br>제품별 집계 기준(제휴 수익 포함·합산 여부 등)은 각 기업 화면의 "데이터 메모"를 확인하세요. 노보 노디스크 매출은 Bloomberg가 덴마크 크로네를 달러로 환산한 값이라 환율의 영향을 받습니다.`;
+  const cov=sel.map(s=>{const ks=Object.keys(s.it.p[fq(f)]).filter(k=>s.it.p[fq(f)][k]!=null).sort();return ks.length?`${s.it.name} ${labF(f,ks[0])}~${labF(f,ks[ks.length-1])}`:`${s.it.name} (${f==='a'?'연간':'분기'} 데이터 없음)`}).join(' · ');
+  $('cmpNote').innerHTML=(sel.length?`데이터 범위: ${esc(cov)}<br>`:'')+(CMP.est?'숫자 뒤 "E"·옅은 막대·점선은 컨센서스 추정치입니다(추정치가 있는 기업만 제공).<br>':'')+`성장률은 비교할 ${f==='a'?'전년':'전년 동기'} 값이 있어야 계산되어 각 제품의 첫 ${f==='a'?'해':'4개 분기'}에는 나타나지 않습니다. 전년 매출이 작으면(연간 100·분기 30백만 USD 미만) 성장률이 과장될 수 있어 툴팁에 "소액"으로 표시합니다. 원본에 없는 기간은 선을 이어 그리지 않고 끊어 보여줍니다. 증감률이 −100%~+300%를 벗어나면 경계에 붙여 그리고 실제 값은 마우스를 올리면 나옵니다. 막대+선 복합 차트는 두 축의 0을 같은 높이에 맞추며, 4개 이상 고르면 제품별 차트로 나뉩니다.<br>제품별 집계 기준(제휴 수익 포함·합산 여부 등)은 각 기업 화면의 "데이터 메모"를 확인하세요. 노보 노디스크 매출은 Bloomberg가 덴마크 크로네를 달러로 환산한 값이라 환율의 영향을 받습니다.`;
 }
 
 /* ================= 2단계: 주가 · 시가총액/밸류에이션 · 뉴스 =================
