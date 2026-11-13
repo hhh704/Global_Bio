@@ -958,7 +958,7 @@ function tipMove(e){
 /* ---------- product compare ---------- */
 const CMP_MAX=8;
 const SHAPES=['circle','square','diamond','tri','triD','hex','plus','pent'];
-const ALIAS={Dupixent:'듀피젠트',Eylea:'아일리아',Libtayo:'리브타요',Praluent:'프랄런트',Kevzara:'케브자라',Trikafta:'트리카프타',Alyftrek:'알리프트렉',Casgevy:'카스게비',Journavx:'저나벡스',Vyvgart:'비브가르트',Amvuttra:'암부트라',Onpattro:'온파트로',Givlaari:'기블라리',Oxlumo:'옥슬루모',Rezdiffra:'레즈디프라',Elevidys:'엘레비디스',mRESVIA:'엠레스비아',Spikevax:'스파이크박스'};   // 데이터의 product.ko가 우선. 새 기업 제품의 한글명은 build 단계에서 ko로 넣는 것을 권장
+const ALIAS={Tryngolza:'트린골자',Dawnzera:'다운제라',Dupixent:'듀피젠트',Eylea:'아일리아',Libtayo:'리브타요',Praluent:'프랄런트',Kevzara:'케브자라',Trikafta:'트리카프타',Alyftrek:'알리프트렉',Casgevy:'카스게비',Journavx:'저나벡스',Vyvgart:'비브가르트',Amvuttra:'암부트라',Onpattro:'온파트로',Givlaari:'기블라리',Oxlumo:'옥슬루모',Rezdiffra:'레즈디프라',Elevidys:'엘레비디스',mRESVIA:'엠레스비아',Spikevax:'스파이크박스'};   // 데이터의 product.ko가 우선. 새 기업 제품의 한글명은 build 단계에서 ko로 넣는 것을 권장
 const CMP_EX=[{t:'듀피젠트 vs 트리카프타',l:[['REGN','Dupixent (worldwide)'],['VRTX','Trikafta/Kaftrio']]},{t:'암부트라 vs 비브가르트',l:[['ALNY','Amvuttra'],['ARGX','Vyvgart (Efgartigimod)']]},{t:'레즈디프라 vs 엘레비디스',l:[['MDGL','Rezdiffra (resmetirom)'],['SRPT','Elevidys (delandistrogene moxeparvovec)']]}];   // 기업이 늘면 예시 조합 추가 (예: {t:'A vs B',l:[['CO1','제품 en'],['CO2','제품 en']]})
 const CMP={f:'a',sel:[],q:'',act:0,v:'combo',sc:'shared'};
 let CMP_ALL=null;
